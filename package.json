@@ -1,0 +1,19 @@
+{
+  "name": "@sv/contracts",
+  "version": "0.1.0",
+  "description": "Shared enums, permission keys, error codes and DTO types for SV-BASE (sv-api + sv-web)",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist",
+    "prepare": "npm run build"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}
