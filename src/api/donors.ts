@@ -26,7 +26,7 @@ export const DonorRegistrationChannel = {
 } as const;
 export type DonorRegistrationChannel = (typeof DonorRegistrationChannel)[keyof typeof DonorRegistrationChannel];
 
-/** รูปแบบที่อยู่จัดส่งของที่ระลึก — `TEXT` ข้อความล้วน (ข้อมูลเดิม/นำเข้า) · `STRUCTURED` ที่อยู่ + ตำบล/อำเภอ/จังหวัด/รหัสไปรษณีย์ */
+/** รูปแบบที่อยู่จัดส่งของที่ระลึกที่ใช้งาน — `TEXT` ข้อความล้วน (ข้อมูลเดิม/นำเข้า) · `STRUCTURED` ที่อยู่ + ตำบล/อำเภอ/จังหวัด/รหัสไปรษณีย์ */
 export const DonorAddressFormat = {
   TEXT: 'TEXT',
   STRUCTURED: 'STRUCTURED',
@@ -108,10 +108,12 @@ export function formatThaiPhone(input: string): string {
 }
 
 /**
- * ที่อยู่จัดส่งที่ส่งเข้า API (`POST`/`PATCH /donors` · ช่อง `address`) — บันทึกเฉพาะรูปแบบที่เลือก (ช่องของอีกแบบถูกล้าง)
- * - `TEXT`: `text` (ว่าง = ไม่มีที่อยู่)
- * - `STRUCTURED`: `addressLine` + `subdistrictId` (API หาอำเภอ/จังหวัดเอง) · `postcode` ว่าง = ใช้ของตำบล ·
- *   `districtId`/`provinceId` ส่งมาได้เพื่อตรวจว่าตรงกับตำบล · ไม่กรอกอะไรเลย = ไม่มีที่อยู่
+ * ที่อยู่จัดส่งที่ส่งเข้า API (`POST`/`PATCH /donors` · ช่อง `address`) — ส่งทั้งก้อน: ข้อความ (`text`) + แบบฟอร์ม เก็บได้ทั้ง 2 ชุด ·
+ * `format` = ชุดที่ใช้งาน (ใช้ส่งของ) · อีกชุดเก็บไว้อ้างอิง เช่น ข้อความต้นฉบับขณะแปลงเป็นแบบฟอร์ม (SV-ADR-056)
+ * - ชุดที่เลือกต้องครบ — `TEXT`: `text` · `STRUCTURED`: `addressLine` + `subdistrictId` (API หาอำเภอ/จังหวัดเอง) · `postcode` ว่าง = ของตำบล ·
+ *   `districtId`/`provinceId` ส่งมาได้เพื่อตรวจว่าตรงกับตำบล
+ * - ชุดที่ไม่ได้เลือกกรอกค้างได้ แต่ค่าที่มีต้องถูกต้อง (id มีจริง · สัมพันธ์กัน · รหัสไปรษณีย์ 5 หลัก) · ช่องที่ไม่ส่ง = ว่าง
+ * - ว่างทั้ง 2 ชุด = ไม่มีที่อยู่ · ชุดที่เลือกว่างแต่อีกชุดมี = 422 ที่ `address.text` / `address.addressLine`
  * - `address: null` = ล้างที่อยู่ · ไม่ส่ง key = ไม่แตะที่อยู่เดิม (PATCH)
  */
 export interface DonorAddressInput {
@@ -134,7 +136,10 @@ export interface DonorCreateInput {
   address?: DonorAddressInput | null;
 }
 
-/** ที่อยู่ที่ส่งออก — ชื่อพื้นที่ th/en มาด้วยเพื่อให้ list/view ไม่ต้องยิงซ้ำ · `format = TEXT` มีแค่ `text` */
+/**
+ * ที่อยู่ที่ส่งออก — ชื่อพื้นที่ th/en มาด้วยเพื่อให้ list/view ไม่ต้องยิงซ้ำ · มีทั้ง 2 ชุด (SV-ADR-056) →
+ * จุดที่ "แสดง/ใช้" ที่อยู่ต้องเลือกตาม `format` (`formatDonorAddress` · `recipientFromDonor` · `donorAddressText`) ไม่ใช่ดูว่าช่องไหนมีค่า
+ */
 export interface DonorAddressView {
   format: DonorAddressFormat;
   text: string | null;

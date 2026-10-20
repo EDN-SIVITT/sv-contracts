@@ -5,6 +5,11 @@
 export const SmsProvider = {
   /** ThaiBulkSMS API v2 (`POST https://api-v2.thaibulksms.com/sms` · Basic auth key:secret) */
   THAIBULKSMS: 'THAIBULKSMS',
+  /**
+   * SMS Gateway ของหน่วยงานเอง (TrueID notify หรือ gateway อื่นที่รับรูปเดียวกัน) — `POST <sms.gatewayUrl>` JSON ·
+   * header `Authorization` = `sms.gatewayAuth` ตามที่กรอก · สำเร็จ = HTTP 2xx + `code` `"10001"` (SV-ADR-073 · `T-109`)
+   */
+  TRUEID: 'TRUEID',
 } as const;
 export type SmsProvider = (typeof SmsProvider)[keyof typeof SmsProvider];
 

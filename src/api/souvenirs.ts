@@ -15,7 +15,7 @@ export type SouvenirStatus = (typeof SouvenirStatus)[keyof typeof SouvenirStatus
 
 /**
  * ชนิดการเคลื่อนไหวสต็อก (สมุดบัญชี append-only `souvenir_stock_movements` · SV-ADR-050)
- * `RECEIVE` รับเข้า lot ใหม่ (+) · `ADJUST` ปรับยอด lot (±) · `ISSUE` ตัดออกด้วยออเดอร์ (−) · `RETURN` คืนเข้า lot เดิมเมื่อยกเลิกออเดอร์ (+)
+ * `RECEIVE` รับเข้า lot ใหม่ (+) · `ADJUST` ปรับยอด lot (±) · `ISSUE` ตัดออกด้วยออเดอร์ (−) · `RETURN` คืนเข้า lot เดิมเมื่อยกเลิกออเดอร์ / ลดรายการของออเดอร์ที่ยืนยันแล้ว (+)
  */
 export const StockMovementType = {
   RECEIVE: 'RECEIVE',
@@ -25,11 +25,24 @@ export const StockMovementType = {
 } as const;
 export type StockMovementType = (typeof StockMovementType)[keyof typeof StockMovementType];
 
-/** ชนิดเอกสารอ้างอิงของ movement (`ref_type`) — ตอนนี้มีแค่ออเดอร์ (`ref_id` = `orders.id` · `refNo` = เลขที่ออเดอร์) */
+/**
+ * ชนิดเอกสารอ้างอิงของ movement (`ref_type` VARCHAR(20)) — ทั้งสองค่าอ้างออเดอร์ (`ref_id` = `orders.id` · `refNo` = เลขที่ออเดอร์)
+ * `ORDER` ตัดตอนเข้ากลุ่มถือของ (`ORDER_STOCK_HELD_STATUSES`) / คืนตอนออกจากกลุ่ม (ย้อนเป็นรอยืนยัน · ยกเลิก — SV-ADR-074) ·
+ * `ORDER_EDIT` = movement เดิมจากการแก้รายการของออเดอร์ที่ยืนยันแล้ว (`T-103` · SV-ADR-067 — ถูกแทนแล้ว: แก้รายการได้เฉพาะรอยืนยัน · ไม่สร้างแถวใหม่) **ยังนับ**ในยอดที่ถืออยู่
+ * ยอดที่ออเดอร์ถืออยู่ต่อ lot = −Σ `qty` ของทุก movement ที่ `ref_type` อยู่ใน `ORDER_STOCK_REF_TYPES` และ `ref_id` เดียวกัน
+ */
 export const StockRefType = {
   ORDER: 'ORDER',
+  ORDER_EDIT: 'ORDER_EDIT',
 } as const;
 export type StockRefType = (typeof StockRefType)[keyof typeof StockRefType];
+
+/** `ref_type` ที่อ้างออเดอร์ (หน้าเว็บทำลิงก์ `/orders/[refId]` · API เติม `refNo`) */
+export const ORDER_STOCK_REF_TYPES: readonly StockRefType[] = [StockRefType.ORDER, StockRefType.ORDER_EDIT];
+
+export function isOrderStockRef(refType: StockRefType | string | null | undefined): boolean {
+  return (ORDER_STOCK_REF_TYPES as readonly (string | null | undefined)[]).includes(refType);
+}
 
 /** ตัวกรองคงเหลือใน list (`GET /souvenirs?stock=`) และ badge — `LOW` 0 < คงเหลือ ≤ จุดเตือน · `OUT` = 0 */
 export const StockFilter = {
@@ -39,12 +52,15 @@ export const StockFilter = {
 export type StockFilter = (typeof StockFilter)[keyof typeof StockFilter];
 
 /**
- * ลำดับของ list (`GET /souvenirs?sort=`) — ไม่ส่ง = `updated_at DESC` (เดิม) · มูลค่าเท่ากันเรียง `updated_at DESC, id DESC` ต่อ
- * หน้าเว็บกดหัวคอลัมน์ "มูลค่า" วน น้อย→มาก → มาก→น้อย → ค่าเริ่มต้น (`REQ-SVN-014` · `T-085`) · ระบบลูกเพิ่มคอลัมน์อื่นได้ที่นี่
+ * ลำดับของ list (`GET /souvenirs?sort=`) — ไม่ส่ง = `updated_at DESC` (เดิม) · ค่าเท่ากันเรียง `updated_at DESC, id DESC` ต่อ
+ * หน้าเว็บกดหัวคอลัมน์ "มูลค่า" วน น้อย→มาก → มาก→น้อย → ค่าเริ่มต้น (`REQ-SVN-014` · `T-085`) ·
+ * `threshold_*` = เรียงตามเกณฑ์ยอดบริจาค (`REQ-SVN-015` · `T-099`) · ระบบลูกเพิ่มคอลัมน์อื่นได้ที่นี่
  */
 export const SouvenirSort = {
   VALUE_ASC: 'value_asc',
   VALUE_DESC: 'value_desc',
+  THRESHOLD_ASC: 'threshold_asc',
+  THRESHOLD_DESC: 'threshold_desc',
 } as const;
 export type SouvenirSort = (typeof SouvenirSort)[keyof typeof SouvenirSort];
 
@@ -60,6 +76,11 @@ export const SOUVENIR_IMAGE_MAX_PX: Readonly<Record<SouvenirImageSize, number>> 
 export const SOUVENIR_IMAGE_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
 /** `image_version` = hex 8 ตัว สุ่มใหม่ทุกครั้งที่อัปโหลด → URL `?v=` เปลี่ยน → ตอบ immutable ได้ (แบบไอคอนระบบ `branding.controller`) */
 export const SOUVENIR_IMAGE_VERSION_LENGTH = 8;
+/**
+ * เพดานจำนวนรูปต่อสินค้า (`T-100` · SV-ADR-064) — ค่าคงที่ ไม่ใช่ settings · ครบแล้วเพิ่มอีก → 422 `SOUVENIR_IMAGES_LIMIT` `details { max }`
+ * รูปเรียงตาม `sortOrder` · รูปแรก = **รูปหลัก** เสมอ (= `imageVersion` ของสินค้า → list · ออเดอร์ · popup เลือกของ · รายการบริจาค)
+ */
+export const SOUVENIR_IMAGES_MAX = 10;
 
 /** ความยาวสูงสุดของช่องกรอก — ตรงกับคอลัมน์ใน `0008_souvenirs_orders.sql` (DOM-04) */
 export const SOUVENIR_CATEGORY_NAME_MAX_LENGTH = 100;
@@ -71,9 +92,10 @@ export const SOUVENIR_DESCRIPTION_MAX_LENGTH = 2000;
 export const SOUVENIR_LOT_NO_MAX_LENGTH = 50;
 /**
  * มูลค่า/หน่วย (บาท · ใช้เหมือนราคาขาย) DECIMAL(12,2) — 0 ถึงค่านี้ · ทศนิยม ≤ 2 · `0` = ของแจก ไม่กินงบ (`SV-CR-005` ข้อ 2 · `REQ-SVN-014`)
- * งบของที่ระลึกในรายการบริจาค = Σ qty × มูลค่า ≤ ยอดบริจาค (`sumSouvenirValue` · `./donations.ts`) · เทียบด้วย `parseMoneyToSatang`
+ * มูลค่า = ข้อมูลรอง (`T-104`) — งบของที่ระลึกในรายการบริจาคคิดจาก **เกณฑ์ยอดบริจาค** (Σ qty × `donationThreshold` ≤ ยอดบริจาค · `sumSouvenirThreshold` · `./donations.ts`)
  */
 export const SOUVENIR_VALUE_MAX = '9999999.99';
+// เกณฑ์ยอดบริจาค (`donationThreshold` · REQ-SVN-015 · T-099) ใช้เพดาน/รูปแบบเดียวกับมูลค่า — `SOUVENIR_VALUE_MAX` · ค่าหลักที่แสดงแบบราคา + ใช้คิดงบ (`T-104`)
 /** หมายเหตุของ lot และของ movement (ปรับยอด = บังคับกรอก) */
 export const STOCK_NOTE_MAX_LENGTH = 500;
 /** จำนวนแถวที่หน้า view แสดงในการ์ด — lot ที่ยังมีของ 5 แถวแรก · การเคลื่อนไหวล่าสุด 10 รายการ (CR ข้อ 1.2) */
@@ -161,6 +183,11 @@ export interface SouvenirListItemView {
   unit: string | null;
   /** มูลค่า/หน่วย DECIMAL(12,2) เป็นข้อความ (`"120.00"`) · ของเดิมก่อน `0009` = `"0.00"` */
   value: string;
+  /**
+   * เกณฑ์ยอดบริจาค (บาท) DECIMAL(12,2) เป็นข้อความ (`"1500.00"`) — ผู้บริจาคที่ยอดถึงค่านี้ขึ้นไปเลือกของนี้ได้ (กติกาเลือกยังไม่ทำ) ·
+   * `"0.00"` = ไม่มีเกณฑ์ · ของเดิมก่อน `0014` = `"0.00"` (`REQ-SVN-015` · `T-099`)
+   */
+  donationThreshold: string;
   status: SouvenirStatus;
   /** คงเหลือ — คอลัมน์ denormalized อัปเดตใน transaction เดียวกับทุก movement (= Σ `qtyRemaining` ของ lot) */
   stockOnHand: number;
@@ -177,6 +204,8 @@ export interface SouvenirListItemView {
 /** หน้า view (`GET /souvenirs/:id`) */
 export interface SouvenirView extends SouvenirListItemView {
   description: string | null;
+  /** รูปทั้งหมดเรียงแล้ว (`sortOrder` 0..n-1) · ตัวแรก = รูปหลัก (version เดียวกับ `imageVersion`) · ไม่มีรูป = `[]` (`T-100`) */
+  images: SouvenirImageView[];
   /** lot ที่ยังมีของ (`qtyRemaining > 0`) เรียง FIFO · สูงสุด `SOUVENIR_VIEW_LOTS_PREVIEW` แถว */
   lots: SouvenirLotView[];
   /** จำนวน lot ที่ยังมีของทั้งหมด (ไม่ใช่แค่ที่ส่งมาใน `lots`) */
@@ -202,10 +231,47 @@ export interface SouvenirInput {
    * API รับตัวเลข (`120.5`) ได้ด้วยแบบ `unitCost` · ผิดรูป/ติดลบ/ทศนิยม > 2 → 422 `INVALID_FORMAT` · เกินเพดาน → 422 `OUT_OF_RANGE` (`T-085`)
    */
   value?: string | number;
+  /**
+   * เกณฑ์ยอดบริจาค (บาท) กติกาเดียวกับ `value` ทุกข้อ (ข้อความ/ตัวเลข · ทศนิยม ≤ 2 · 0 – `SOUVENIR_VALUE_MAX`) — **`POST` ต้องส่ง** ·
+   * `PATCH` ไม่ส่ง = คงเดิม · ผิด → 422 `details { field: 'donationThreshold', reason: REQUIRED|INVALID_FORMAT|OUT_OF_RANGE }` (`REQ-SVN-015` · `T-099`)
+   */
+  donationThreshold?: string | number;
   description?: string;
   status?: SouvenirStatus;
   /** int ≥ 0 · `null`/ไม่ส่ง = ไม่เตือน */
   lowStockThreshold?: number | null;
+}
+
+// ── รูปหลายรูป (`souvenir_images` · REQ-SVN-003 · `T-100` · SV-ADR-064) ──────────────────────────
+
+/**
+ * รูป 1 รูปของสินค้า — ไม่มี storage key · หน้าเว็บโหลดผ่าน `/souvenir-image/<souvenirId>/<size>?img=<id>&v=<version>`
+ * API: `GET /souvenirs/:id/images/:imageId/:size` (READ_ONLY) · `…/public` (เฉพาะสินค้า `ACTIVE` · อื่น 404 กลาง)
+ */
+export interface SouvenirImageView {
+  id: string;
+  /** hex 8 ตัว เปลี่ยนทุกครั้งที่อัปโหลด/แทนที่ (`?v=` · ETag `"<version>-<size>"`) */
+  version: string;
+  /** 0..n-1 · 0 = รูปหลัก */
+  sortOrder: number;
+}
+
+/**
+ * body ของ `PUT /souvenirs/:id/images/order` — id ของรูป**ทุกรูป**ของสินค้านี้ตามลำดับใหม่ (ตัวแรก = รูปหลัก)
+ * ขาด · เกิน · ซ้ำ · เป็นของสินค้าอื่น → 422 `SOUVENIR_IMAGE_ORDER_INVALID` `details { field: 'imageIds', reason }`
+ */
+export interface SouvenirImagesOrderInput {
+  imageIds: string[];
+}
+
+/** คำตอบของ `POST /souvenirs/:id/images` · `DELETE /souvenirs/:id/images/:imageId` · `PUT /souvenirs/:id/images/order` = สถานะรูปหลังทำ */
+export interface SouvenirImagesResult {
+  souvenirId: string;
+  /** version ของรูปหลักใหม่ (= `SouvenirListItemView.imageVersion`) · `null` = ไม่มีรูปแล้ว */
+  imageVersion: string | null;
+  images: SouvenirImageView[];
+  /** เฉพาะ `POST` — รูปที่เพิ่งเพิ่ม (ต่อท้าย) */
+  image?: SouvenirImageView;
 }
 
 // ── สต็อกแบบ lot (`souvenir_lots` + `souvenir_stock_movements` · REQ-SVN-007…011) ──────────────

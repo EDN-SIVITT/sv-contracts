@@ -97,18 +97,39 @@ export const ErrorCode = {
   SOUVENIR_LOT_IN_USE: 'SOUVENIR_LOT_IN_USE',
   /** ไฟล์รูปไม่ใช่ png/jpg/webp · อ่านเป็นรูปไม่ได้ · เกิน `s3.maxUploadSizeMb` — 422 `details { field: 'file', accepted?, maxMb? }` */
   SOUVENIR_IMAGE_INVALID: 'SOUVENIR_IMAGE_INVALID',
+  /** เพิ่มรูปเมื่อสินค้ามีรูปครบ `SOUVENIR_IMAGES_MAX` แล้ว — 422 `details { field: 'file', max }` (`T-100`) */
+  SOUVENIR_IMAGES_LIMIT: 'SOUVENIR_IMAGES_LIMIT',
+  /** ลำดับรูปที่ส่งมาไม่ใช่ชุด id ครบของสินค้านี้ (ขาด · เกิน · ซ้ำ · ของสินค้าอื่น) — 422 `details { field: 'imageIds', reason }` (`T-100`) */
+  SOUVENIR_IMAGE_ORDER_INVALID: 'SOUVENIR_IMAGE_ORDER_INVALID',
   /** สต็อกไม่พอ — ปรับยอด lot ติดลบ หรือยืนยันออเดอร์แล้ว lot รวมไม่พอ (rollback ทั้ง transaction) — 422 `details { souvenirId, code, name, requested, available }` */
   STOCK_INSUFFICIENT: 'STOCK_INSUFFICIENT',
-  /** เปลี่ยนสถานะออเดอร์ไม่ตรง `ORDER_STATUS_TRANSITIONS` — 409 `details { from, to }` */
+  /** เปลี่ยนสถานะออเดอร์ไม่ตรง `ORDER_STATUS_TRANSITIONS` (ไปสถานะเดิม) · ยกเลิกจากรายการบริจาคเมื่อออเดอร์ไม่อยู่ใน `ORDER_OPEN_STATUSES` — 409 `details { from, to }` */
   ORDER_STATUS_INVALID: 'ORDER_STATUS_INVALID',
-  /** แก้/ลบออเดอร์ในสถานะที่ไม่อนุญาต (ส่ง `items` ตอน CONFIRMED · แก้ SHIPPED/CANCELLED · ลบที่ไม่ใช่ DRAFT) — 409 `details { status }` */
+  /**
+   * แก้/ลบออเดอร์ในสถานะที่ไม่อนุญาต (SV-ADR-074) — ส่งช่องของส่วนที่ล็อก (`ORDER_EDITABLE_SECTIONS`) → 409 `details { status, section }` ·
+   * สถานะที่ไม่มีส่วนแก้ได้ (SHIPPED/RECEIVED/CANCELLED) · ลบที่ไม่ใช่ DRAFT → 409 `details { status }`
+   */
   ORDER_NOT_EDITABLE: 'ORDER_NOT_EDITABLE',
+  /**
+   * ย้อนออเดอร์ที่ออกจากรายการบริจาคออกจาก `CANCELLED` ไม่ได้ — รายการบริจาคต้นทางถูกลบ · มีออเดอร์ active ของชุดอื่น · หรือสถานะไม่รองรับ (SV-ADR-074 · SV-ADR-077) —
+   * 409 `details { donationId, donationNo, status, orderId, orderNos, deleted }` (สถานะ/ออเดอร์ active ของรายการบริจาค ณ ตอนนี้ · `orderId` = ใบแรก หรือ `null`)
+   */
+  ORDER_DONATION_RELINK_CONFLICT: 'ORDER_DONATION_RELINK_CONFLICT',
   /** ออเดอร์ต้องมีรายการอย่างน้อย 1 รายการ — 422 `details { field: 'items' }` */
   ORDER_ITEMS_EMPTY: 'ORDER_ITEMS_EMPTY',
   /** สินค้าเดียวกันซ้ำหลายรายการในออเดอร์เดียว — 422 `details { field: 'items', souvenirId }` */
   ORDER_ITEM_DUPLICATE: 'ORDER_ITEM_DUPLICATE',
   /** ออกเลขที่ออเดอร์ไม่สำเร็จ — เลขที่ประกอบได้ชนกับเลขเดิมติดกันหลายครั้ง (ตรวจคำนำหน้า/จำนวนหลักในเมนูตั้งค่า) — 409 `details { attempts }` */
   ORDER_NO_CONFLICT: 'ORDER_NO_CONFLICT',
+  /** ลบออเดอร์ที่ออกจากรายการบริจาค (`source_donation_id` · `T-108`) — 409 `details { donationId, donationNo }` · ให้ยกเลิกออเดอร์แทน (รายการบริจาคกลับเป็นยืนยัน) */
+  ORDER_LINKED_TO_DONATION: 'ORDER_LINKED_TO_DONATION',
+  /** อ้างอิงรายการบริจาค (`sourceDonationId`) ให้ออเดอร์ที่อ้างอิง/ออกจากรายการบริจาคอยู่แล้ว (`T-117` · SV-ADR-079) — 409 `details { donationId, donationNo }` · เปลี่ยนไม่ได้ ต้องยกเลิกออเดอร์ */
+  ORDER_DONATION_ALREADY_LINKED: 'ORDER_DONATION_ALREADY_LINKED',
+  // ── รายชื่อขนส่ง (`T-096` · REQ-SET-049 · ตั้งค่า → ออเดอร์) ──
+  /** ชื่อขนส่งซ้ำกับแถวที่ยังไม่ลบ (ไม่สนตัวพิมพ์) — 422 `details { field: 'name', name }` */
+  SHIPPING_CARRIER_NAME_TAKEN: 'SHIPPING_CARRIER_NAME_TAKEN',
+  /** ลบขนส่งที่ยังมีออเดอร์ (ที่ยังไม่ลบ) อ้างอยู่ — 409 `details { orderCount }` · ให้ปิดใช้งานแทน */
+  SHIPPING_CARRIER_IN_USE: 'SHIPPING_CARRIER_IN_USE',
   // ── รายการบริจาค (`SV-CR-005` ข้อ 3 · FT-17 · SV-ADR-053 · `T-084`) ──
   /** มูลค่าของที่ระลึกรวม (Σ qty × มูลค่าปัจจุบัน) เกินยอดบริจาค — 422 `details { amount, souvenirTotal }` (ข้อความทศนิยม 2 ตำแหน่ง) */
   DONATION_SOUVENIR_OVER_AMOUNT: 'DONATION_SOUVENIR_OVER_AMOUNT',
@@ -116,9 +137,14 @@ export const ErrorCode = {
   DONATION_ITEM_DUPLICATE: 'DONATION_ITEM_DUPLICATE',
   /** ตั้งสถานะ `REJECTED` (ฟอร์ม/ปุ่มปฏิเสธ) โดยไม่มีเหตุผล — 422 `details { field: 'rejectReason' }` */
   DONATION_REJECT_REASON_REQUIRED: 'DONATION_REJECT_REASON_REQUIRED',
-  /** ปุ่มเร็วยืนยัน/ปฏิเสธจากสถานะที่ไม่ใช่ `PENDING` (`DONATION_STATUS_TRANSITIONS`) — 409 `details { from, to }` */
+  /** ปุ่มของรายการบริจาคจากสถานะที่ไม่ตรง `DONATION_ACTION_TRANSITIONS` (ยืนยัน/ปฏิเสธ ≠ PENDING · ออกออเดอร์ ≠ CONFIRMED/มีออเดอร์แล้ว · ยกเลิกออเดอร์ ≠ ORDERED) — 409 `details { from, to }` */
   DONATION_STATUS_INVALID: 'DONATION_STATUS_INVALID',
-  /** ไฟล์สลิปไม่ใช่ png/jpg/webp · อ่านเป็นรูปไม่ได้ · เกิน `s3.maxUploadSizeMb` — 422 `details { field: 'file', accepted?, maxMb? }` */
+  /** แก้/ลบ/อัปโหลด-ลบสลิปของรายการที่ออกออเดอร์แล้ว (`ORDERED` · `T-108`) — 409 `details { status }` (ออเดอร์ที่ผูกดูจาก `DonationView.orders` · `T-113`) · ยกเลิกออเดอร์ก่อน */
+  DONATION_NOT_EDITABLE: 'DONATION_NOT_EDITABLE',
+  /**
+   * ไฟล์หลักฐานการโอนใช้ไม่ได้ — 422 `details { field: 'file', reason, accepted?, maxMb?, max? }` · `reason`: `REQUIRED` ไม่แนบ · `TOO_LARGE` เกิน `s3.maxUploadSizeMb` (`maxMb`) ·
+   * `NOT_IMAGE` ไม่ใช่รูปและไม่ใช่ PDF (`accepted`) · `FORMAT` รูปชนิดอื่น · `DIMENSIONS` · `CORRUPT` · `TOO_MANY` ครบ `PAYMENT_SLIP_FILES_MAX` แล้ว (`max`) (`T-112`)
+   */
   DONATION_SLIP_INVALID: 'DONATION_SLIP_INVALID',
   /** ออกเลขที่รายการบริจาคไม่สำเร็จ — เลขที่ประกอบได้ชนกับเลขเดิมติดกันหลายครั้ง (ตรวจคำนำหน้า/จำนวนหลักในเมนูตั้งค่า) — 409 `details { attempts }` */
   DONATION_NO_CONFLICT: 'DONATION_NO_CONFLICT',

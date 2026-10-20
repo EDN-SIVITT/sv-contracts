@@ -1,5 +1,5 @@
 import type { LineChannel } from '../enums/line';
-import { SMS_PROVIDERS } from './sms';
+import { SMS_PROVIDERS, SmsProvider } from './sms';
 
 /**
  * กลุ่มค่าตั้งค่า — FT-11 · TEC-03 §3.5 (`GET/PATCH /settings/:group`)
@@ -60,6 +60,8 @@ export const SettingKey = {
   GENERAL_SYSTEM_SHORT_NAME: 'general.systemShortName',
   /** ไอคอนระบบ (JSON descriptor) — **จัดการผ่าน `/branding/icon` เท่านั้น** อยู่ใน `MANAGED_SETTING_KEYS` (`REQ-SET-030`) */
   GENERAL_SYSTEM_ICON: 'general.systemIcon',
+  /** หน้าจอโหลดเมื่อเปลี่ยนหน้า/เมนูของ CMS (แถบบน + ฉากคลุมพื้นที่เนื้อหา) — `REQ-SET-048` · `REQ-UIX-010` · SV-ADR-055 · ค่าเริ่มต้น `true` */
+  GENERAL_PAGE_LOADING_SCREEN: 'general.pageLoadingScreen',
   S3_ENDPOINT: 's3.endpoint',
   S3_REGION: 's3.region',
   S3_BUCKET: 's3.bucket',
@@ -95,6 +97,12 @@ export const SettingKey = {
   SMS_API_SECRET: 'sms.apiSecret',
   /** ชื่อผู้ส่งที่ลงทะเบียนกับผู้ให้บริการ (≤ 11 ตัว `A–Z a–z 0–9` ช่องว่าง `. _ -`) — `REQ-SET-037` */
   SMS_SENDER: 'sms.sender',
+  /** ผู้ให้บริการ `TRUEID` (SMS Gateway ภายใน · SV-ADR-073 · `T-109`): URL ที่รับ `POST` (http/https ≤ 500) — `REQ-SET-037` */
+  SMS_GATEWAY_URL: 'sms.gatewayUrl',
+  /** ค่า header `Authorization` ของ gateway (SECRET · เข้ารหัส · ส่งตามที่กรอก เช่น `Bearer …`) — `REQ-SET-037` */
+  SMS_GATEWAY_AUTH: 'sms.gatewayAuth',
+  /** Sender ID ของ gateway (≤ 100 ตัว `A–Z a–z 0–9 . _ : -` · เช่น UUID) — `REQ-SET-037` */
+  SMS_SENDER_ID: 'sms.senderId',
   /** คำนำหน้ารหัสของที่ระลึก 0–10 ตัว `A–Z a–z 0–9 - _` (ว่างได้) — `REQ-SET-038` · ค่าเริ่มต้น `SVN` */
   SOUVENIR_CODE_PREFIX: 'souvenir.codePrefix',
   /** จำนวนหลักขั้นต่ำของเลขลำดับรหัสของที่ระลึก 1–12 — `REQ-SET-039` · ค่าเริ่มต้น 4 (`SVN0001`) · รหัสที่ออกแล้วไม่เปลี่ยน */
@@ -116,10 +124,27 @@ export const SettingKey = {
   ORDER_LABEL_SHOW_ITEMS: 'order.labelShowItems',
   /** พิมพ์บาร์โค้ด Code 128 ของเลขที่ออเดอร์ — `REQ-SET-045` · ค่าเริ่มต้น `true` */
   ORDER_LABEL_SHOW_BARCODE: 'order.labelShowBarcode',
+  /**
+   * สีสถานะออเดอร์ `#RRGGBB` (บังคับ) — `REQ-SET-050` · SV-ADR-075 · `T-111` · ลำดับ = `OrderStatus` · แผนที่สถานะ → key = `ORDER_STATUS_COLOR_KEYS` (`./orders.ts`) ·
+   * ค่าเริ่มต้น `ORDER_STATUS_COLOR_DEFAULTS` · badge/แท็บทุกหน้าอ่านผ่าน `GET /orders/status-colors` (สิทธิ์ออเดอร์ READ_ONLY · ค่าเสีย/ว่าง = ค่าเริ่มต้น)
+   */
+  ORDER_STATUS_COLOR_DRAFT: 'order.statusColorDraft',
+  ORDER_STATUS_COLOR_CONFIRMED: 'order.statusColorConfirmed',
+  ORDER_STATUS_COLOR_PREPARING: 'order.statusColorPreparing',
+  ORDER_STATUS_COLOR_SHIPPED: 'order.statusColorShipped',
+  ORDER_STATUS_COLOR_RECEIVED: 'order.statusColorReceived',
+  ORDER_STATUS_COLOR_CANCELLED: 'order.statusColorCancelled',
+  /**
+   * สีเลขที่ออเดอร์ `#RRGGBB` (บังคับ) — `REQ-SET-051` · SV-ADR-078 · `T-115` · คู่กับ `DONATION_NO_COLOR` ให้ผู้ใช้แยก 2 ชนิดเลขที่ด้วยสี ·
+   * แผนที่ชนิด → key = `REF_NO_COLOR_KEYS` (`./ref-no-colors.ts`) · ค่าเริ่มต้น `REF_NO_COLOR_DEFAULTS` · อ่านผ่าน `GET /orders/ref-no-colors` / `GET /donations/ref-no-colors`
+   */
+  ORDER_NO_COLOR: 'order.noColor',
   /** คำนำหน้าเลขที่รายการบริจาค 0–10 ตัว (ว่างได้) — `REQ-SET-046` · ค่าเริ่มต้น `DON` */
   DONATION_NO_PREFIX: 'donation.noPrefix',
   /** จำนวนหลักขั้นต่ำของเลขลำดับรายการบริจาค 1–12 — `REQ-SET-047` · ค่าเริ่มต้น 6 (`DON000001`) · เลขที่ออกแล้วไม่เปลี่ยน */
   DONATION_NO_DIGITS: 'donation.noDigits',
+  /** สีเลขที่รายการบริจาค `#RRGGBB` (บังคับ) — `REQ-SET-051` · SV-ADR-078 · คู่กับ `ORDER_NO_COLOR` (ดูข้างบน) */
+  DONATION_NO_COLOR: 'donation.noColor',
 } as const;
 export type SettingKey = (typeof SettingKey)[keyof typeof SettingKey];
 
@@ -132,6 +157,14 @@ export const AUDIT_LOG_RETENTION_MIN_DAYS = 30;
 export const AUDIT_LOG_RETENTION_DEFAULT_DAYS = 90;
 /** 10 ปี — กันพิมพ์ผิดจนปุ่มลบไม่มีวันทำงาน ไม่ใช่ข้อกำหนดจากเอกสาร */
 export const AUDIT_LOG_RETENTION_MAX_DAYS = 3650;
+
+/** ค่าเริ่มต้นของ `general.pageLoadingScreen` — API (ยังไม่รัน `0010` / อ่านไม่ได้) และเว็บ (API รุ่นเก่าไม่ส่ง `uiPreferences`) ใช้ตัวเดียวกัน */
+export const PAGE_LOADING_SCREEN_DEFAULT = true;
+
+/** การแสดงผลของ CMS ที่ผู้ใช้ทุกคนได้จาก `GET /auth/me` (ไม่ต้องมีสิทธิ์เมนูตั้งค่า) — SV-ADR-055 */
+export interface UiPreferences {
+  pageLoadingScreen: boolean;
+}
 
 export const SESSION_IDLE_DEFAULT_MINUTES = 30;
 export const SESSION_CHECK_INTERVAL_DEFAULT_SECONDS = 60;
@@ -192,6 +225,9 @@ export interface SettingStringRule {
   multiline?: boolean;
 }
 
+/** สี `#RRGGBB` (สีสถานะออเดอร์ · SV-ADR-075 · สีเลขที่ · SV-ADR-078) — บังคับ · ตัวพิมพ์เล็ก/ใหญ่ได้ · ไม่ตรง = `INVALID_FORMAT` */
+const HEX_COLOR_RULE: SettingStringRule = { required: true, maxChars: 7, pattern: /^#[0-9A-Fa-f]{6}$/ };
+
 export const SETTING_STRING_RULES: Readonly<Record<string, SettingStringRule>> = {
   [SettingKey.GENERAL_SYSTEM_NAME_TH]: { required: true, maxChars: 100 },
   [SettingKey.GENERAL_SYSTEM_NAME_EN]: { required: true, maxChars: 100 },
@@ -209,6 +245,9 @@ export const SETTING_STRING_RULES: Readonly<Record<string, SettingStringRule>> =
   [SettingKey.SMS_PROVIDER]: { required: true, maxChars: 30, allowedValues: SMS_PROVIDERS },
   // ชื่อผู้ส่ง (sender name ที่ลงทะเบียนกับผู้ให้บริการ) — alphanumeric sender ของ SMS ยาวได้ 11 ตัว
   [SettingKey.SMS_SENDER]: { required: false, maxChars: 11, pattern: /^[A-Za-z0-9 ._-]*$/ },
+  // SV-ADR-073 — TrueID / SMS Gateway ภายใน: ว่างได้ตอนยังไม่ตั้ง (ส่งจริง = `SMS_NOT_CONFIGURED`) · URL ต้องขึ้นต้น http(s):// + มี host · ไม่มีช่องว่าง
+  [SettingKey.SMS_GATEWAY_URL]: { required: false, maxChars: 500, pattern: /^https?:\/\/[^\s/?#@]+(?:[/?#]\S*)?$/i },
+  [SettingKey.SMS_SENDER_ID]: { required: false, maxChars: 100, pattern: /^[A-Za-z0-9._:-]*$/ },
   // SV-CR-004 ข้อ 2.4 — คำนำหน้ารหัส/เลขที่ ใช้กฎเดียวกับรหัสผู้บริจาค (พิมพ์บนใบแปะหน้า/บาร์โค้ด Code 128 → ASCII เท่านั้น)
   [SettingKey.SOUVENIR_CODE_PREFIX]: { required: false, maxChars: 10, pattern: /^[A-Za-z0-9_-]*$/ },
   [SettingKey.ORDER_NO_PREFIX]: { required: false, maxChars: 10, pattern: /^[A-Za-z0-9_-]*$/ },
@@ -217,6 +256,26 @@ export const SETTING_STRING_RULES: Readonly<Record<string, SettingStringRule>> =
   [SettingKey.ORDER_LABEL_SENDER_NAME]: { required: false, maxChars: 100 },
   [SettingKey.ORDER_LABEL_SENDER_PHONE]: { required: false, maxChars: 30 },
   [SettingKey.ORDER_LABEL_SENDER_ADDRESS]: { required: false, maxChars: 300 },
+  // SV-ADR-075 — สีสถานะออเดอร์ (ค่าเสียที่แก้ตรง DB → `GET /orders/status-colors` ใช้ค่าเริ่มต้นของสถานะนั้น)
+  [SettingKey.ORDER_STATUS_COLOR_DRAFT]: HEX_COLOR_RULE,
+  [SettingKey.ORDER_STATUS_COLOR_CONFIRMED]: HEX_COLOR_RULE,
+  [SettingKey.ORDER_STATUS_COLOR_PREPARING]: HEX_COLOR_RULE,
+  [SettingKey.ORDER_STATUS_COLOR_SHIPPED]: HEX_COLOR_RULE,
+  [SettingKey.ORDER_STATUS_COLOR_RECEIVED]: HEX_COLOR_RULE,
+  [SettingKey.ORDER_STATUS_COLOR_CANCELLED]: HEX_COLOR_RULE,
+  // SV-ADR-078 — สีเลขที่ออเดอร์ / รายการบริจาค (ค่าเสียที่แก้ตรง DB → `GET /…/ref-no-colors` ใช้ค่าเริ่มต้น)
+  [SettingKey.ORDER_NO_COLOR]: HEX_COLOR_RULE,
+  [SettingKey.DONATION_NO_COLOR]: HEX_COLOR_RULE,
+};
+
+/**
+ * ค่าในหมวด `sms` ที่ผู้ให้บริการแต่ละเจ้าต้องใช้ (ลำดับ = ลำดับในฟอร์ม · ทุกตัวต้องไม่ว่างจึงส่งได้) — SV-ADR-073 · **แหล่งความจริงเดียว**:
+ * API = ขาดตัวไหนบอกใน `SMS_NOT_CONFIGURED.details.missing` · หน้าเว็บ = แสดง/ส่งเฉพาะช่องของผู้ให้บริการที่เลือกใน dropdown
+ * (ค่าของอีกเจ้ายังเก็บใน DB — สลับกลับแล้วใช้ได้ทันที) · เพิ่มผู้ให้บริการ = เพิ่มแถวที่นี่ (สูตร TEC-11 ข้อ 8)
+ */
+export const SMS_PROVIDER_SETTING_KEYS: Readonly<Record<SmsProvider, readonly string[]>> = {
+  [SmsProvider.THAIBULKSMS]: [SettingKey.SMS_API_KEY, SettingKey.SMS_API_SECRET, SettingKey.SMS_SENDER],
+  [SmsProvider.TRUEID]: [SettingKey.SMS_GATEWAY_URL, SettingKey.SMS_GATEWAY_AUTH, SettingKey.SMS_SENDER_ID],
 };
 
 export type SettingStringProblem = 'REQUIRED' | 'TOO_LONG' | 'INVALID_CHARACTERS' | 'INVALID_FORMAT';
