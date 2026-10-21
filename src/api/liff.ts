@@ -152,12 +152,14 @@ export interface DonorLinkView {
  * body ของ `POST …/donor/registration` (เฉพาะ state `REGISTRATION_REQUIRED`) — ที่อยู่แบบฟอร์มเท่านั้น (`STRUCTURED` — ไม่มีแบบข้อความ)
  * กฎความยาว/รูปแบบเดียวกับฟอร์มของ CMS (`DONOR_*_MAX_LENGTH` ใน `./donors`) · error 422 ลงช่อง (`details.field` = `fullName` · `address.<ช่อง>`)
  * บังคับเฉพาะชื่อ (`SV-CR-003` ข้อ 2.4 ติด * ช่องเดียว · `T-074` ตัดสิน) · ที่อยู่ไม่ส่ง/`null`/ว่างทุกช่อง = ไม่มีที่อยู่ ·
- * กรอกบางช่อง = ต้องครบ `addressLine` + `subdistrictId` (แบบฟอร์มของ CMS) · `lineId`/`email` = `''` → ไม่มีค่า
+ * กรอกบางช่อง = ต้องครบ `addressLine` + `subdistrictId` (แบบฟอร์มของ CMS) · `lineId`/`email` = `''` → ไม่มีค่า ·
+ * `taxId` ไม่บังคับ (`T-120` · กฎ `normalizeThaiTaxId`): `''`/`null` = ไม่มี · **ไม่ส่ง key = ไม่แตะค่าเดิม** (หน้าเว็บรุ่นเก่า) · ผิด = 422 `taxId`
  */
 export interface DonorRegistrationInput {
   fullName: string;
   lineId?: string;
   email?: string;
+  taxId?: string | null;
   address?: {
     addressLine?: string;
     subdistrictId?: string;
@@ -177,6 +179,8 @@ export interface DonorLiffProfileView {
   phoneFormatted: string;
   email: string | null;
   lineId: string | null;
+  /** เลขประจำตัวผู้เสียภาษี ตัวเลขล้วน 13 หลัก (แสดงด้วย `formatThaiTaxId`) · ไม่มี = `null` (`T-120`) */
+  taxId: string | null;
   status: DonorStatus;
   registrationChannel: DonorRegistrationChannel;
   address: DonorAddressView | null;

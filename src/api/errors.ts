@@ -137,10 +137,18 @@ export const ErrorCode = {
   DONATION_ITEM_DUPLICATE: 'DONATION_ITEM_DUPLICATE',
   /** ตั้งสถานะ `REJECTED` (ฟอร์ม/ปุ่มปฏิเสธ) โดยไม่มีเหตุผล — 422 `details { field: 'rejectReason' }` */
   DONATION_REJECT_REASON_REQUIRED: 'DONATION_REJECT_REASON_REQUIRED',
-  /** ปุ่มของรายการบริจาคจากสถานะที่ไม่ตรง `DONATION_ACTION_TRANSITIONS` (ยืนยัน/ปฏิเสธ ≠ PENDING · ออกออเดอร์ ≠ CONFIRMED/มีออเดอร์แล้ว · ยกเลิกออเดอร์ ≠ ORDERED) — 409 `details { from, to }` */
+  /**
+   * ปุ่มของรายการบริจาคจากสถานะที่ไม่ตรง `DONATION_ACTION_TRANSITIONS` (ยืนยัน/ปฏิเสธ ≠ PENDING · ออกออเดอร์ ≠ CONFIRMED/มีออเดอร์แล้ว · ยกเลิกออเดอร์ ≠ ORDERED ·
+   * ยกเลิกการยืนยัน ≠ CONFIRMED/มีออเดอร์ active) · ฟอร์ม `PATCH` เปลี่ยนสถานะของ CONFIRMED (`T-119`) — 409 `details { from, to }`
+   */
   DONATION_STATUS_INVALID: 'DONATION_STATUS_INVALID',
   /** แก้/ลบ/อัปโหลด-ลบสลิปของรายการที่ออกออเดอร์แล้ว (`ORDERED` · `T-108`) — 409 `details { status }` (ออเดอร์ที่ผูกดูจาก `DonationView.orders` · `T-113`) · ยกเลิกออเดอร์ก่อน */
   DONATION_NOT_EDITABLE: 'DONATION_NOT_EDITABLE',
+  /**
+   * ช่องการเงินของรายการที่ยืนยันรับชำระแล้ว (`DONATION_PAYMENT_LOCKED_STATUSES` · `T-119` · SV-ADR-081) — 409 `details { status, fields }` (`DonationPaymentLockedDetails`):
+   * `PATCH` ที่เปลี่ยนยอด/วันที่โอน/ผู้บริจาค/หมายเหตุสลิปจริง · เพิ่ม/ลบไฟล์หลักฐาน (`fields: ['slipFiles']`) · ลบรายการ (`fields: []`) · ให้ "ยกเลิกการยืนยัน" ก่อน (donations FULL)
+   */
+  DONATION_PAYMENT_LOCKED: 'DONATION_PAYMENT_LOCKED',
   /**
    * ไฟล์หลักฐานการโอนใช้ไม่ได้ — 422 `details { field: 'file', reason, accepted?, maxMb?, max? }` · `reason`: `REQUIRED` ไม่แนบ · `TOO_LARGE` เกิน `s3.maxUploadSizeMb` (`maxMb`) ·
    * `NOT_IMAGE` ไม่ใช่รูปและไม่ใช่ PDF (`accepted`) · `FORMAT` รูปชนิดอื่น · `DIMENSIONS` · `CORRUPT` · `TOO_MANY` ครบ `PAYMENT_SLIP_FILES_MAX` แล้ว (`max`) (`T-112`)

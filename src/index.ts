@@ -24,3 +24,4 @@ export * from './api/liff';
 export * from './api/sms';
 export * from './api/session';
 export * from './api/history';
+export * from './api/dashboard';

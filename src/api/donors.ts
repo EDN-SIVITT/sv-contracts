@@ -108,6 +108,42 @@ export function formatThaiPhone(input: string): string {
 }
 
 /**
+ * เลขประจำตัวผู้เสียภาษี (ไม่บังคับ · ใช้ออกใบกำกับภาษี — `T-120` · SV-ADR-082) = ตัวเลข 13 หลัก ·
+ * หลักที่ 13 = check digit: `(11 − (Σ หลักที่ i × (14 − i), i = 1..12) mod 11) mod 10` — กฎเดียวกันทั้งเลขบัตรประชาชนและเลขนิติบุคคล
+ * เก็บเป็นตัวเลขล้วน (`donors.tax_id` VARCHAR(13)) · แสดงแบบ `x-xxxx-xxxxx-xx-x` · ไม่ unique
+ */
+export const DONOR_TAX_ID_LENGTH = 13;
+/** ช่องกรอกรับขีด/ช่องว่างได้ (`1-2345-67890-12-1`) — ยาวสุดก่อน normalize */
+export const DONOR_TAX_ID_INPUT_MAX_LENGTH = 30;
+/** อักขระจัดรูปแบบที่ผู้ใช้พิมพ์ปนเลขได้ — ตัดทิ้งก่อนตรวจ */
+const TAX_ID_FORMAT_CHARS = /[\s-]/g;
+const TAX_ID_DIGITS = new RegExp(`^\\d{${DONOR_TAX_ID_LENGTH}}$`);
+
+/**
+ * เลขประจำตัวผู้เสียภาษี → ตัวเลขล้วน 13 หลัก (รูปที่เก็บใน DB) · ไม่ใช่ 13 หลัก / มีตัวอักษร / check digit ผิด → `null`
+ * `1-2345-67890-12-1` · `1 2345 67890 12 1` → `1234567890121` · ใช้ตัวเดียวกันทั้ง API และฟอร์มเว็บ (แบบ `normalizeThaiPhone`)
+ */
+export function normalizeThaiTaxId(input: string): string | null {
+  const digits = input.trim().replace(TAX_ID_FORMAT_CHARS, '');
+  if (!TAX_ID_DIGITS.test(digits)) return null;
+  let sum = 0;
+  for (let i = 0; i < DONOR_TAX_ID_LENGTH - 1; i += 1) sum += Number(digits[i]) * (DONOR_TAX_ID_LENGTH - i);
+  return (11 - (sum % 11)) % 10 === Number(digits[DONOR_TAX_ID_LENGTH - 1]) ? digits : null;
+}
+
+/** เลข 13 หลักที่ถูกต้อง (รับทั้งรูปตัวเลขล้วนและรูปที่มีขีด/ช่องว่าง) */
+export function isValidThaiTaxId(input: string): boolean {
+  return normalizeThaiTaxId(input) !== null;
+}
+
+/** รูปแสดงผล `x-xxxx-xxxxx-xx-x` (`1-2345-67890-12-1`) · ค่าที่ไม่ใช่ตัวเลข 13 หลักคืนตามเดิม (ไม่ตรวจ check digit — ข้อมูลเก่ายังอ่านได้) */
+export function formatThaiTaxId(input: string): string {
+  const digits = input.trim().replace(TAX_ID_FORMAT_CHARS, '');
+  if (!TAX_ID_DIGITS.test(digits)) return input;
+  return `${digits.slice(0, 1)}-${digits.slice(1, 5)}-${digits.slice(5, 10)}-${digits.slice(10, 12)}-${digits.slice(12)}`;
+}
+
+/**
  * ที่อยู่จัดส่งที่ส่งเข้า API (`POST`/`PATCH /donors` · ช่อง `address`) — ส่งทั้งก้อน: ข้อความ (`text`) + แบบฟอร์ม เก็บได้ทั้ง 2 ชุด ·
  * `format` = ชุดที่ใช้งาน (ใช้ส่งของ) · อีกชุดเก็บไว้อ้างอิง เช่น ข้อความต้นฉบับขณะแปลงเป็นแบบฟอร์ม (SV-ADR-056)
  * - ชุดที่เลือกต้องครบ — `TEXT`: `text` · `STRUCTURED`: `addressLine` + `subdistrictId` (API หาอำเภอ/จังหวัดเอง) · `postcode` ว่าง = ของตำบล ·
@@ -132,6 +168,8 @@ export interface DonorCreateInput {
   phone: string;
   email?: string;
   lineId?: string;
+  /** เลขประจำตัวผู้เสียภาษี (ไม่บังคับ) — มีขีด/ช่องว่างได้ (`normalizeThaiTaxId`) · `''`/`null` = ไม่มี · ผิด = 422 `{ field: 'taxId', reason: 'INVALID_FORMAT' }` */
+  taxId?: string | null;
   status?: DonorStatus;
   address?: DonorAddressInput | null;
 }
@@ -182,6 +220,8 @@ export interface DonorListItemView {
 
 /** หน้า view (`GET /donors/:id`) */
 export interface DonorView extends DonorListItemView {
+  /** เลขประจำตัวผู้เสียภาษี ตัวเลขล้วน 13 หลัก (แสดงด้วย `formatThaiTaxId()`) · ไม่มี = `null` — ไม่อยู่ในแถวของ list (ไม่แสดงในตาราง · ค้นด้วย `q` ได้) */
+  taxId: string | null;
   lineUserId: string | null;
   lineLinkedAt: string | null;
   /** เวลายอมรับ consent ครั้งล่าสุด (`donor_consents` · ยอมรับตอนผูก/สมัครผ่านหน้า LINE OA — `T-074`) · ยังไม่เคย = `null` */

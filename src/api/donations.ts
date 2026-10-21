@@ -9,6 +9,7 @@ import {
 } from './orders';
 import type { ApiListResponse } from './response';
 import { formatSequenceCode } from './sequence-code';
+import { SettingKey } from './settings';
 import type { SouvenirStatus } from './souvenirs';
 
 /**
@@ -43,6 +44,34 @@ export function isDonationLocked(status: DonationStatus): boolean {
   return DONATION_LOCKED_STATUSES.includes(status);
 }
 
+/**
+ * ยอดชำระที่ยืนยันแล้ว = บัญชีรายรับ (SV-ADR-081 · `T-119`) — สถานะที่ "ช่องการเงิน" (`DonationPaymentField`) แก้ไม่ได้:
+ * `PATCH` ที่ทำให้ช่องเหล่านี้**เปลี่ยนจริง** (ส่งค่าเดิม = ไม่ error) · เพิ่ม/ลบไฟล์หลักฐาน · `DELETE` → 409 `DONATION_PAYMENT_LOCKED` `{ status, fields }`
+ * (`ORDERED` ตอบ `DONATION_NOT_EDITABLE` ก่อนตามเดิม) · ทางย้อนทางเดียว = ปุ่ม "ยกเลิกการยืนยัน" (`unconfirm` · donations FULL) · ของ/ผู้รับ/หมายเหตุยังแก้ได้
+ */
+export const DONATION_PAYMENT_LOCKED_STATUSES: readonly DonationStatus[] = [DonationStatus.CONFIRMED, DonationStatus.ORDERED];
+
+/** `isDonationPaymentLocked('CONFIRMED')` → `true` — หน้าเว็บแสดงส่วนชำระเงินแบบอ่านอย่างเดียว + ป้าย "ยืนยันรับชำระแล้ว" · ซ่อนปุ่มลบ/สลิป */
+export function isDonationPaymentLocked(status: DonationStatus): boolean {
+  return DONATION_PAYMENT_LOCKED_STATUSES.includes(status);
+}
+
+/** ช่องการเงินของรายการบริจาค (ชื่อ = ช่องใน body/view) — `slipFiles` = ไฟล์หลักฐาน (`POST`/`DELETE /donations/:id/slips`) · `details.fields` ของ `DONATION_PAYMENT_LOCKED` */
+export const DonationPaymentField = {
+  AMOUNT: 'amount',
+  DONATION_DATE: 'donationDate',
+  DONOR_ID: 'donorId',
+  SLIP_NOTE: 'slipNote',
+  SLIP_FILES: 'slipFiles',
+} as const;
+export type DonationPaymentField = (typeof DonationPaymentField)[keyof typeof DonationPaymentField];
+
+/** `details` ของ 409 `DONATION_PAYMENT_LOCKED` — `fields` = ช่องการเงินที่พยายามเปลี่ยน (ลบรายการ = `[]`) */
+export interface DonationPaymentLockedDetails {
+  status: DonationStatus;
+  fields: DonationPaymentField[];
+}
+
 /** ช่องทางที่สร้างรายการ — `STAFF` เจ้าหน้าที่บันทึก (รอบนี้) · `LINE_OA` ผู้บริจาคแจ้งเองผ่าน LINE OA (จองค่าไว้รอบหน้า · Q-050) */
 export const DonationSource = {
   STAFF: 'STAFF',
@@ -51,29 +80,33 @@ export const DonationSource = {
 export type DonationSource = (typeof DonationSource)[keyof typeof DonationSource];
 
 /**
- * วงจรสถานะผ่านปุ่ม (ไม่รวมฟอร์มแก้ไข — `PATCH` ตั้ง PENDING/CONFIRMED/REJECTED ได้อิสระเมื่อยังไม่ `ORDERED`)
- * PENDING → CONFIRMED/REJECTED (ยืนยัน/ปฏิเสธ) · CONFIRMED → ORDERED (ออกออเดอร์) · ORDERED → CONFIRMED (ยกเลิกออเดอร์ — จากเมนูไหนก็ได้)
+ * วงจรสถานะผ่านปุ่ม (ไม่รวมฟอร์มแก้ไข — `PATCH` ตั้ง PENDING/CONFIRMED/REJECTED ได้เมื่อเป็น PENDING/REJECTED · CONFIRMED ส่งได้แค่ค่าเดิม
+ * (อื่น → 409 `DONATION_STATUS_INVALID` · SV-ADR-081) · `ORDERED` แก้ไม่ได้)
+ * PENDING → CONFIRMED/REJECTED (ยืนยัน/ปฏิเสธ) · CONFIRMED → ORDERED (ออกออเดอร์) / PENDING (ยกเลิกการยืนยัน · FULL · เหตุผลบังคับ · `T-119`) ·
+ * ORDERED → CONFIRMED (ยกเลิกออเดอร์ — จากเมนูไหนก็ได้)
  * แต่ละปุ่มเริ่มได้จากสถานะเดียว (`DONATION_ACTION_TRANSITIONS`) · ไม่ตรง → 409 `DONATION_STATUS_INVALID` details `{ from, to }`
  */
 export const DONATION_STATUS_TRANSITIONS: Readonly<Record<DonationStatus, readonly DonationStatus[]>> = {
   PENDING: [DonationStatus.CONFIRMED, DonationStatus.REJECTED],
-  CONFIRMED: [DonationStatus.ORDERED],
+  CONFIRMED: [DonationStatus.ORDERED, DonationStatus.PENDING],
   ORDERED: [DonationStatus.CONFIRMED],
   REJECTED: [],
 };
 
-/** `canTransitionDonation('CONFIRMED', 'REJECTED')` → `false` (ฟอร์มแก้ไขไม่ถูกจำกัด) */
+/** `canTransitionDonation('CONFIRMED', 'REJECTED')` → `false` (ฟอร์มแก้ไขของ PENDING/REJECTED ไม่ถูกจำกัด) */
 export function canTransitionDonation(from: DonationStatus, to: DonationStatus): boolean {
   return DONATION_STATUS_TRANSITIONS[from].includes(to);
 }
 
 /**
  * ปุ่มของรายการบริจาค → สถานะต้นทาง/ปลายทาง — API ตรวจ `from` ใต้ล็อก · หน้าเว็บเลือกปุ่มจากตารางเดียวกันนี้
- * `confirm` `reject` = `POST /donations/:id/confirm|reject` · `order` = `POST /donations/:id/order` · `cancelOrder` = `POST /donations/:id/cancel-order`
+ * `confirm` `reject` = `POST /donations/:id/confirm|reject` · `order` = `POST /donations/:id/order` · `cancelOrder` = `POST /donations/:id/cancel-order` ·
+ * `unconfirm` = `POST /donations/:id/unconfirm` (`T-119` · SV-ADR-081 · donations FULL · ต้องไม่มีออเดอร์ active)
  */
 export const DONATION_ACTION_TRANSITIONS = {
   confirm: { from: DonationStatus.PENDING, to: DonationStatus.CONFIRMED },
   reject: { from: DonationStatus.PENDING, to: DonationStatus.REJECTED },
+  unconfirm: { from: DonationStatus.CONFIRMED, to: DonationStatus.PENDING },
   order: { from: DonationStatus.CONFIRMED, to: DonationStatus.ORDERED },
   cancelOrder: { from: DonationStatus.ORDERED, to: DonationStatus.CONFIRMED },
 } as const satisfies Record<string, { from: DonationStatus; to: DonationStatus }>;
@@ -83,6 +116,32 @@ export type DonationStatusAction = keyof typeof DONATION_ACTION_TRANSITIONS;
 export function canDonationAction(status: DonationStatus, action: DonationStatusAction): boolean {
   return DONATION_ACTION_TRANSITIONS[action].from === status;
 }
+
+/**
+ * สีต่อสถานะ (SV-ADR-080 · `T-118` · `REQ-SET-052`) — ตั้งค่าได้ในเมนู ตั้งค่า → รายการบริจาค (4 key หมวด `donation` · `#RRGGBB` ตาม `SETTING_STRING_RULES`) ·
+ * แบบเดียวกับสีสถานะออเดอร์ (`ORDER_STATUS_COLOR_KEYS` · SV-ADR-075): badge = จุดสี + พื้นสีจาง + ตัวอักษรสีปกติของธีม · แท็บที่เลือก = เส้นใต้ + ตัวเลขสีสถานะ ·
+ * อ่านผ่าน `GET /donations/status-colors` (สิทธิ์รายการบริจาค READ_ONLY · ค่าเสีย/ว่าง = ค่าเริ่มต้น)
+ */
+export const DONATION_STATUS_COLOR_KEYS: Readonly<Record<DonationStatus, SettingKey>> = {
+  PENDING: SettingKey.DONATION_STATUS_COLOR_PENDING,
+  CONFIRMED: SettingKey.DONATION_STATUS_COLOR_CONFIRMED,
+  ORDERED: SettingKey.DONATION_STATUS_COLOR_ORDERED,
+  REJECTED: SettingKey.DONATION_STATUS_COLOR_REJECTED,
+};
+
+/**
+ * ค่าเริ่มต้น (= seed `0026`) — ใช้เมื่อแถวหาย/ค่าเสีย · หน้าเว็บที่ผู้ใช้ไม่มีสิทธิ์รายการบริจาค · ปุ่ม "คืนค่าเริ่มต้น" ·
+ * = สี token ของธีมที่ badge ใช้ก่อน `T-118` (หน้าตาเดิมไม่เปลี่ยน): รอการยืนยัน `--color-warning` · ยืนยัน `--color-success` · ออกออเดอร์แล้ว `--color-brand` · ปฏิเสธ `--color-danger`
+ */
+export const DONATION_STATUS_COLOR_DEFAULTS: Readonly<DonationStatusColors> = {
+  PENDING: '#F59E0B',
+  CONFIRMED: '#16A34A',
+  ORDERED: '#2563EB',
+  REJECTED: '#DC2626',
+};
+
+/** response ของ `GET /donations/status-colors` — `#RRGGBB` ตัวพิมพ์ใหญ่ครบทุกสถานะ */
+export type DonationStatusColors = Record<DonationStatus, string>;
 
 /** ความยาวสูงสุดของช่องกรอก — ตรงกับคอลัมน์ใน `0009_donations.sql` (DOM-04) */
 export const DONATION_NOTE_MAX_LENGTH = 1000;
@@ -405,6 +464,16 @@ export type DonationUpdateInput = Partial<DonationCreateInput>;
 
 /** body ของ `POST /donations/:id/reject` — เหตุผลบังคับ ≤ `DONATION_REJECT_REASON_MAX_LENGTH` */
 export interface DonationRejectInput {
+  reason: string;
+}
+
+/**
+ * body ของ `POST /donations/:id/unconfirm` ("ยกเลิกการยืนยัน" · `T-119` · SV-ADR-081) — เหตุผลบังคับ (trim) ≤ `DONATION_REJECT_REASON_MAX_LENGTH` ·
+ * ไม่ส่ง/ช่องว่างล้วน → 422 `VALIDATION_FAILED` `{ field: 'reason', reason: 'REQUIRED' }` · ยาวเกิน/ชนิดผิด → 400 ·
+ * ต้อง `CONFIRMED` + ไม่มีออเดอร์ active (ตรวจใต้ล็อก · ไม่ตรง → 409 `DONATION_STATUS_INVALID` `{ from, to: 'PENDING' }`) →
+ * `PENDING` + ล้างผู้ตรวจ + ยอดสะสมผู้บริจาคใหม่ · เหตุผลเก็บใน audit (`donation_status` after `reason`) ไม่มีคอลัมน์ · response = `DonationView` หลังเปลี่ยน
+ */
+export interface DonationUnconfirmInput {
   reason: string;
 }
 

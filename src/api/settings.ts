@@ -145,6 +145,14 @@ export const SettingKey = {
   DONATION_NO_DIGITS: 'donation.noDigits',
   /** สีเลขที่รายการบริจาค `#RRGGBB` (บังคับ) — `REQ-SET-051` · SV-ADR-078 · คู่กับ `ORDER_NO_COLOR` (ดูข้างบน) */
   DONATION_NO_COLOR: 'donation.noColor',
+  /**
+   * สีสถานะรายการบริจาค `#RRGGBB` (บังคับ) — `REQ-SET-052` · SV-ADR-080 · `T-118` · ลำดับ = `DonationStatus` · แผนที่สถานะ → key = `DONATION_STATUS_COLOR_KEYS` (`./donations.ts`) ·
+   * ค่าเริ่มต้น `DONATION_STATUS_COLOR_DEFAULTS` · badge/แท็บ/จุดสถานะทุกหน้าอ่านผ่าน `GET /donations/status-colors` (สิทธิ์รายการบริจาค READ_ONLY · ค่าเสีย/ว่าง = ค่าเริ่มต้น)
+   */
+  DONATION_STATUS_COLOR_PENDING: 'donation.statusColorPending',
+  DONATION_STATUS_COLOR_CONFIRMED: 'donation.statusColorConfirmed',
+  DONATION_STATUS_COLOR_ORDERED: 'donation.statusColorOrdered',
+  DONATION_STATUS_COLOR_REJECTED: 'donation.statusColorRejected',
 } as const;
 export type SettingKey = (typeof SettingKey)[keyof typeof SettingKey];
 
@@ -225,7 +233,7 @@ export interface SettingStringRule {
   multiline?: boolean;
 }
 
-/** สี `#RRGGBB` (สีสถานะออเดอร์ · SV-ADR-075 · สีเลขที่ · SV-ADR-078) — บังคับ · ตัวพิมพ์เล็ก/ใหญ่ได้ · ไม่ตรง = `INVALID_FORMAT` */
+/** สี `#RRGGBB` (สีสถานะออเดอร์ · SV-ADR-075 · สีเลขที่ · SV-ADR-078 · สีสถานะรายการบริจาค · SV-ADR-080) — บังคับ · ตัวพิมพ์เล็ก/ใหญ่ได้ · ไม่ตรง = `INVALID_FORMAT` */
 const HEX_COLOR_RULE: SettingStringRule = { required: true, maxChars: 7, pattern: /^#[0-9A-Fa-f]{6}$/ };
 
 export const SETTING_STRING_RULES: Readonly<Record<string, SettingStringRule>> = {
@@ -266,6 +274,11 @@ export const SETTING_STRING_RULES: Readonly<Record<string, SettingStringRule>> =
   // SV-ADR-078 — สีเลขที่ออเดอร์ / รายการบริจาค (ค่าเสียที่แก้ตรง DB → `GET /…/ref-no-colors` ใช้ค่าเริ่มต้น)
   [SettingKey.ORDER_NO_COLOR]: HEX_COLOR_RULE,
   [SettingKey.DONATION_NO_COLOR]: HEX_COLOR_RULE,
+  // SV-ADR-080 — สีสถานะรายการบริจาค (ค่าเสียที่แก้ตรง DB → `GET /donations/status-colors` ใช้ค่าเริ่มต้นของสถานะนั้น)
+  [SettingKey.DONATION_STATUS_COLOR_PENDING]: HEX_COLOR_RULE,
+  [SettingKey.DONATION_STATUS_COLOR_CONFIRMED]: HEX_COLOR_RULE,
+  [SettingKey.DONATION_STATUS_COLOR_ORDERED]: HEX_COLOR_RULE,
+  [SettingKey.DONATION_STATUS_COLOR_REJECTED]: HEX_COLOR_RULE,
 };
 
 /**
