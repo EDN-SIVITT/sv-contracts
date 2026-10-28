@@ -912,6 +912,7 @@ export const StockLotExpiry = {
   NO_EXPIRY: 'NO_EXPIRY',
 } as const;
 export type StockLotExpiry = (typeof StockLotExpiry)[keyof typeof StockLotExpiry];
+export const STOCK_LOT_EXPIRIES = Object.values(StockLotExpiry) as readonly StockLotExpiry[];
 
 export function stockLotExpiryOf(expiresAt: string | null, todayYmd: string, withinDays: number = DASHBOARD_EXPIRING_WITHIN_DAYS): StockLotExpiry {
   if (expiresAt === null) return StockLotExpiry.NO_EXPIRY;
@@ -922,7 +923,8 @@ export function stockLotExpiryOf(expiresAt: string | null, todayYmd: string, wit
 
 /**
  * query ของ `GET /reports/stock` — `categoryId` (`none` = ไม่มีหมวด) · `status` สถานะสินค้า (ไม่ส่ง = ทั้งหมด) ·
- * `level` = `LOW`/`OUT` ตาม `stockLevelOf` ของคงเหลือปัจจุบัน (= ตัวกรอง `stock` ของ `/souvenirs`) · `q` รหัส/ชื่อสินค้า · `tab` = แท็บที่ดึงรายการ (แบ่งหน้า)
+ * `level` = `LOW`/`OUT` ตาม `stockLevelOf` ของคงเหลือปัจจุบัน (= ตัวกรอง `stock` ของ `/souvenirs`) · `q` รหัส/ชื่อสินค้า · `tab` = แท็บที่ดึงรายการ (แบ่งหน้า) ·
+ * `expiry` = สถานะอายุของ lot (`stockLotExpiryOf` ณ วันนี้) — กรอง**เฉพาะแท็บ lot** (แถว · แถวรวม · KPI lot) ไม่แตะแท็บสินค้า/ความเคลื่อนไหว (`T-144` · SV-ADR-099)
  */
 export interface StockReportQuery extends ReportPagingQuery {
   from?: string;
@@ -931,6 +933,7 @@ export interface StockReportQuery extends ReportPagingQuery {
   status?: SouvenirStatus;
   level?: StockFilter;
   q?: string;
+  expiry?: StockLotExpiry;
   tab?: StockReportSection;
 }
 
@@ -941,6 +944,8 @@ export interface StockReportFilters {
   status: SouvenirStatus | null;
   level: StockFilter | null;
   q: string | null;
+  /** ตัวกรองสถานะอายุของแท็บ lot */
+  expiry: StockLotExpiry | null;
   /** วันนี้ (ไทย) ที่ใช้คิดสถานะ lot */
   asOfDate: string;
   labels: { category: string | null };
@@ -949,7 +954,7 @@ export interface StockReportFilters {
 /**
  * KPI — `count` = แถวรวมทั้ง 3 แท็บ (เพดานส่งออก) · `products` สินค้าในตัวกรอง ·
  * `outOfStock`/`lowStock` = เฉพาะสินค้า `ACTIVE` ในตัวกรอง (ไม่กรอง = Dashboard `souvenirStock`) · `closingValue` Σ คงเหลือปลายงวด × มูลค่า/หน่วยปัจจุบัน ·
- * `lots` = lot ที่ยังมีของ (ไม่กรอง = Dashboard `souvenirLots`) · `ledgerMismatch` = สินค้าที่ Σ movement ≠ `stock_on_hand` หรือ Σ lot ≠ `stock_on_hand` (0 = ✓)
+ * `lots` = lot ที่ยังมีของ (ไม่กรอง = Dashboard `souvenirLots` · ตาม `expiry` ด้วย) · `ledgerMismatch` = สินค้าที่ Σ movement ≠ `stock_on_hand` หรือ Σ lot ≠ `stock_on_hand` (0 = ✓)
  */
 export interface StockReportKpis {
   count: number;

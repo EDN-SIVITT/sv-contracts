@@ -148,6 +148,15 @@ export const OrderPrintedFilter = {
 } as const;
 export type OrderPrintedFilter = (typeof OrderPrintedFilter)[keyof typeof OrderPrintedFilter];
 
+/**
+ * ตัวกรองสต็อกใน list (`GET /orders?stock=` · SV-ADR-098 · `T-142`) — `SHORT` = ออเดอร์ร่าง "รอของเข้า": `DRAFT` ที่มีสินค้าในใบซึ่ง Σ จำนวนของใบ > คงเหลือจริง
+ * (= เงื่อนไข `STOCK_INSUFFICIENT` ตอนยืนยัน · นับเฉพาะสินค้า ACTIVE ไม่ถูกลบ) · ใช้กับ `statusCounts` ด้วย (แบบ `printed`)
+ */
+export const OrderStockFilter = {
+  SHORT: 'SHORT',
+} as const;
+export type OrderStockFilter = (typeof OrderStockFilter)[keyof typeof OrderStockFilter];
+
 /** ความยาวสูงสุดของช่องกรอก — ตรงกับคอลัมน์ใน `0008_souvenirs_orders.sql` (DOM-04) */
 export const ORDER_RECIPIENT_NAME_MAX_LENGTH = 200;
 /** ที่อยู่ผู้รับ snapshot เป็นข้อความหลายบรรทัด — เก็บเสมอ (แบบฟอร์ม → API แปลงด้วย `recipientAddressText` · SV-ADR-057) */
@@ -297,6 +306,8 @@ export interface OrderListQuery {
   /** แท็บสถานะ (`?status=`) — กรองแถวเท่านั้น ไม่มีผลกับ `statusCounts` */
   status?: OrderStatus;
   printed?: OrderPrintedFilter;
+  /** `SHORT` = ออเดอร์ร่างรอของเข้า (`awaitingStock` · SV-ADR-098) */
+  stock?: OrderStockFilter;
   /** ลิงก์จากหน้าผู้บริจาค (`/orders?donorId=`) */
   donorId?: string;
   page?: number;
@@ -352,6 +363,11 @@ export interface OrderListItemView {
    * ออเดอร์ที่ยังไม่ยกเลิก = ออเดอร์ active ของรายการนั้น (รายการเป็น `ORDERED` ⇔ มี ≥ 1 ใบ · แยกหลายใบได้ `T-113`) · ยกเลิกแล้วยังเก็บไว้เป็นประวัติ · ลบออเดอร์ที่มีค่านี้ไม่ได้ (409 `ORDER_LINKED_TO_DONATION`)
    */
   sourceDonation: OrderSourceDonationRef | null;
+  /**
+   * ออเดอร์ร่าง "รอของเข้า" (Pre-order · SV-ADR-098 · `T-142`) — `true` เฉพาะ `DRAFT` ที่มีสินค้าในใบซึ่ง Σ จำนวนของใบ > คงเหลือจริง (ยืนยันตอนนี้ = `STOCK_INSUFFICIENT`) ·
+   * สถานะอื่น = `false` · คำนวณต่อหน้าจาก SQL กลาง (ตรงกับ `?stock=SHORT` และ Dashboard) · list เท่านั้น
+   */
+  awaitingStock: boolean;
 }
 
 /** รายการบริจาคต้นทางของออเดอร์ — list/view แสดง "อ้างอิง DON…" (ลิงก์ `/donations/[id]`) + สถานะรายการบริจาคปัจจุบัน */
@@ -384,7 +400,7 @@ export interface OrderSplitSiblingView {
 export type OrderRecipientStructuredAddressView = Omit<DonorAddressView, 'format' | 'text'>;
 
 /** หน้า view (`GET /orders/:id`) — ปุ่มที่ทำได้ = `ORDER_STATUS_TRANSITIONS[status]` · ส่วนที่แก้ได้ = `ORDER_EDITABLE_SECTIONS[status]` (ไม่ส่งซ้ำ) */
-export interface OrderView extends OrderListItemView {
+export interface OrderView extends Omit<OrderListItemView, 'awaitingStock'> {
   /** สถานะผู้บริจาค ณ ปัจจุบัน (badge เตือนเมื่อ `SUSPENDED`) · `null` = ถูกลบ */
   donorStatus: DonorStatus | null;
   /** ข้อความล้วน — เก็บทุกรูปแบบ (`STRUCTURED` = ข้อความที่ API แปลงจากแบบฟอร์ม) · ใบแปะหน้า/list/ค้นหาใช้ตัวนี้ */

@@ -54,6 +54,15 @@ export const StockFilter = {
 export type StockFilter = (typeof StockFilter)[keyof typeof StockFilter];
 
 /**
+ * ตัวกรองการจัดสรรใน list (`GET /souvenirs?allocation=` · SV-ADR-098 · `T-142`) — แยกจาก `StockFilter` (badge/`stockLevelOf` ใช้ค่านั้น) ·
+ * `SHORT` = "ขาดตามที่จัดสรร" (Pre-order): `shortage` > 0 · ของที่ไม่ถูกลบ ทุกสถานะ
+ */
+export const SouvenirAllocationFilter = {
+  SHORT: 'SHORT',
+} as const;
+export type SouvenirAllocationFilter = (typeof SouvenirAllocationFilter)[keyof typeof SouvenirAllocationFilter];
+
+/**
  * ลำดับของ list (`GET /souvenirs?sort=`) — ไม่ส่ง = `updated_at DESC` (เดิม) · ค่าเท่ากันเรียง `updated_at DESC, id DESC` ต่อ
  * หน้าเว็บกดหัวคอลัมน์ "มูลค่า" วน น้อย→มาก → มาก→น้อย → ค่าเริ่มต้น (`REQ-SVN-014` · `T-085`) ·
  * `threshold_*` = เรียงตามเกณฑ์ยอดบริจาค (`REQ-SVN-015` · `T-099`) · ระบบลูกเพิ่มคอลัมน์อื่นได้ที่นี่
@@ -168,6 +177,8 @@ export interface SouvenirListQuery {
   categoryId?: string;
   status?: SouvenirStatus;
   stock?: StockFilter;
+  /** `SHORT` = เฉพาะที่ขาดตามที่จัดสรร (`shortage` > 0 · SV-ADR-098) — ใช้ร่วมกับตัวกรอง/เรียง/หน้าอื่นได้ */
+  allocation?: SouvenirAllocationFilter;
   sort?: SouvenirSort;
   page?: number;
   perPage?: number;
@@ -220,10 +231,20 @@ export interface SouvenirListItemView {
   eligibleThreshold: string | null;
   /** ที่แคมเปญยังใช้ได้ (นโยบาย `ALLOCATED` · `T-133`) · อื่น ๆ = `null` */
   campaignAvailable: number | null;
+  /** จัดสรรค้าง Σ remaining ทุกแคมเปญ (SV-ADR-092) · ไม่มีแถวจัดสรร = 0 — SQL กลาง `ALLOCATED_REMAINING_SQL` (`T-142`) */
+  allocatedRemaining: number;
+  /**
+   * "ขาดตามที่จัดสรร" (Pre-order · SV-ADR-098) = max(0, `allocatedRemaining` − `stockOnHand`) = ต้องรับของเข้าอีกเท่านี้จึงครบทุกแคมเปญ ·
+   * = `overAllocated` ของ `GET /souvenirs/:id/allocations` · 0 = ไม่ขาด
+   */
+  shortage: number;
 }
 
-/** หน้า view (`GET /souvenirs/:id`) — ไม่มีบริบทของ picker (`eligibleThreshold` / `campaignAvailable` อยู่เฉพาะ list) */
-export interface SouvenirView extends Omit<SouvenirListItemView, 'eligibleThreshold' | 'campaignAvailable'> {
+/** ช่องของ list ที่คำนวณต่อหน้า (บริบท picker · ยอดจัดสรร) — หน้า view ไม่มี (ยอดจัดสรรของสินค้าอยู่ที่ `GET /souvenirs/:id/allocations`) */
+type SouvenirListOnlyField = 'eligibleThreshold' | 'campaignAvailable' | 'allocatedRemaining' | 'shortage';
+
+/** หน้า view (`GET /souvenirs/:id`) — ไม่มีบริบทของ picker (`eligibleThreshold` / `campaignAvailable` อยู่เฉพาะ list) · ยอดจัดสรรดู `GET /souvenirs/:id/allocations` */
+export interface SouvenirView extends Omit<SouvenirListItemView, SouvenirListOnlyField> {
   description: string | null;
   /** รูปทั้งหมดเรียงแล้ว (`sortOrder` 0..n-1) · ตัวแรก = รูปหลัก (version เดียวกับ `imageVersion`) · ไม่มีรูป = `[]` (`T-100`) */
   images: SouvenirImageView[];

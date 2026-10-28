@@ -214,6 +214,8 @@ export const ErrorCode = {
   CAMPAIGN_ALLOCATION_EXCEEDS_FREE: 'CAMPAIGN_ALLOCATION_EXCEEDS_FREE',
   /** ลดโควตาแคมเปญต่ำกว่าที่ใช้ไปแล้ว (หรือติดลบ) — 422 `details { souvenirId, allocated, used, requested }` */
   CAMPAIGN_ALLOCATION_BELOW_USED: 'CAMPAIGN_ALLOCATION_BELOW_USED',
+  /** คืนบางส่วนเกินส่วนที่ไม่ใช้ (`release { qty }` · SV-ADR-097) — 422 `details { souvenirId, remaining, requested, allocated, used }` */
+  CAMPAIGN_ALLOCATION_RELEASE_EXCEEDS: 'CAMPAIGN_ALLOCATION_RELEASE_EXCEEDS',
   /** ลบแคมเปญที่ยังกันของไว้ (remaining > 0) — 409 `details { remaining }` · คืนส่วนที่ไม่ใช้ก่อน */
   CAMPAIGN_HAS_ALLOCATIONS: 'CAMPAIGN_HAS_ALLOCATIONS',
   // ── ช่องทางติดต่อ (`SV-CR-009` ข้อ 3 · FT-20 · SV-ADR-094 · `T-136`) — ค่าผิดกฎตามประเภทใช้ `VALIDATION_FAILED { field, reason }` · ไอคอนใช้ `FILE_*` / `IMAGE_DIMENSIONS_INVALID` ──

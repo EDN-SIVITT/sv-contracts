@@ -203,19 +203,33 @@ export interface CampaignAllocationsView {
 
 /**
  * body ของ `POST /campaigns/:id/allocations` (campaigns MAINTAIN + souvenirs MAINTAIN) — `qty` จำนวนเต็ม ≠ 0 · |qty| ≤ `CAMPAIGN_ALLOCATION_QTY_MAX` (+ เพิ่ม · − ลด)
- * เพิ่ม: Δremaining ≤ max(0, free) ไม่งั้น 422 `CAMPAIGN_ALLOCATION_EXCEEDS_FREE { souvenirId, requested, free }` ·
+ * เพิ่ม: Δremaining ≤ max(0, free) ไม่งั้น 422 `CAMPAIGN_ALLOCATION_EXCEEDS_FREE { souvenirId, requested, free, delta }` (เว้นแต่ `preorder: true`) ·
  * ลด: ผล ≥ used และ ≥ 0 ไม่งั้น 422 `CAMPAIGN_ALLOCATION_BELOW_USED { souvenirId, allocated, used, requested }` ·
  * สินค้าไม่พบ/ถูกลบ → 422 `{ field: 'souvenirId', reason: 'NOT_FOUND' }` · ระงับ/แคมเปญปิดใช้งาน = ทำได้ · audit `campaign_allocation` CREATE (ครั้งแรก) / UPDATE
+ * (`after.preorderQty` = ส่วนที่เกิน free ของครั้งนี้)
  */
 export interface CampaignAllocationAdjustInput {
   souvenirId: string;
   qty: number;
   /** ≤ `CAMPAIGN_ALLOCATION_NOTE_MAX_LENGTH` · ว่าง = ไม่มี */
   note?: string | null;
+  /**
+   * Pre-order (SV-ADR-098 · `T-142`) — `true` = ยืนยันจัดสรรเกินสต็อกที่ยังไม่จัดสรร (ข้ามเพดาน max(0, free) · free ติดลบได้) ·
+   * ledger `preorderQty` = max(0, Δremaining − max(0, free)) ณ ตอนนั้น (ไม่เกิน = 0) · ไม่ส่ง/`false` = 422 เดิม · ตอนลด (`qty` < 0) = ไม่มีผล
+   */
+  preorder?: boolean;
 }
 
-/** body ของ `POST /campaigns/:id/allocations/:souvenirId/release` — allocated := min(allocated, used) · ไม่มีอะไรคืน = 200 ไม่เขียน (ไม่บันทึก audit) */
+/**
+ * body ของ `POST /campaigns/:id/allocations/:souvenirId/release` (SV-ADR-097 · `T-141`) — ledger `RELEASE` −จำนวนที่คืน · audit `campaign_allocation` UPDATE
+ * - ไม่ส่ง `qty` = คืนทั้งหมด: allocated := min(allocated, used) · ไม่มีอะไรคืน = 200 ไม่เขียน (ไม่บันทึก audit)
+ * - ส่ง `qty` = คืนบางส่วน: allocated −= qty · ต้อง ≤ remaining (= ส่วนที่ไม่ใช้ = max(0, allocated − used) · รวมส่วนที่ออเดอร์ร่างจอง) ไม่งั้น
+ *   422 `CAMPAIGN_ALLOCATION_RELEASE_EXCEEDS { souvenirId, remaining, requested, allocated, used }` (ตรวจใต้ล็อก)
+ */
 export interface CampaignAllocationReleaseInput {
+  /** จำนวนเต็ม 1…`CAMPAIGN_ALLOCATION_QTY_MAX` · ไม่ส่ง = คืนทั้งหมด */
+  qty?: number;
+  /** ≤ `CAMPAIGN_ALLOCATION_NOTE_MAX_LENGTH` · ว่าง = ไม่มี */
   note?: string | null;
 }
 
@@ -238,6 +252,8 @@ export interface CampaignAllocationMovementView {
   type: CampaignAllocationMovementType;
   qty: number;
   qtyAfter: number;
+  /** ส่วนที่จัดสรรเกินสต็อกที่ยังไม่จัดสรร ณ ตอนนั้น (Pre-order · SV-ADR-098 · `0033`) — ประวัติ ไม่ใช่สถานะ · 0 = ไม่เกิน / ลด / คืน / แถวก่อน `0033` */
+  preorderQty: number;
   note: string | null;
   actor: DonationActorView | null;
   createdAt: string;

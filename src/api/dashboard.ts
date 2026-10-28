@@ -6,7 +6,8 @@ import type { StockFilter } from './souvenirs';
  * Dashboard ของ e-Donation (`T-121` API · `T-122` เว็บ · FT-12 · SV-ADR-083) — `GET /dashboard/summary?from&to`
  * วันที่ทุกตัว = `YYYY-MM-DD` **ตามวันไทย** (Asia/Bangkok) · ช่วงรวมปลายทาง · ฟังก์ชันวันที่ในไฟล์นี้คิดจากตัวเลขปฏิทินล้วน (ไม่พึ่ง timezone ของเครื่อง)
  * เงินทุกช่อง = ข้อความ DECIMAL `"1234.50"` (รวมใน SQL · ไม่ผ่าน float — `parseMoneyToSatang` / `formatSatang`)
- * แต่ละส่วน (`donations` · `donors` · `orders` · `souvenirs` · `chat`) = `null` เมื่อผู้ใช้ไม่มีสิทธิ์อ่านเมนูนั้น (ไม่ใช่ 403 · API ไม่ query ส่วนนั้นเลย)
+ * แต่ละส่วน (`donations` · `fundraising` · `donors` · `orders` · `souvenirs` · `chat`) = `null` เมื่อผู้ใช้ไม่มีสิทธิ์อ่านเมนูนั้น (ไม่ใช่ 403 · API ไม่ query ส่วนนั้นเลย)
+ * v2 (`T-144` · SV-ADR-099): `fundraising` (สิทธิ์ `donations`) · `souvenirs.preorder` · `orders.awaitingStock` — ตัวเลขทุกตัวนิยามเดียวกับหน้าปลายทางที่ลิงก์ไป
  */
 
 /** ช่วงยาวสุดที่ขอได้ (วัน · รวมปลายทาง) — 1 ปีอธิกสุรทิน · เกิน → 422 `{ field: 'to', reason: 'TOO_LONG', max }` */
@@ -14,7 +15,7 @@ export const DASHBOARD_RANGE_MAX_DAYS = 366;
 /** วันที่เก่าสุด/ไกลสุดที่รับ — กันพิมพ์ปีผิด (พ.ศ. · ปีหลักร้อย) · นอกช่วง → 422 `{ field, reason: 'OUT_OF_RANGE', min, max }` */
 export const DASHBOARD_DATE_MIN = '1900-01-01';
 export const DASHBOARD_DATE_MAX = '2999-12-31';
-/** จำนวนแถวสูงสุดของรายการอันดับ (ผู้บริจาค · ของที่ระลึกที่แจก · ของใกล้หมด) */
+/** จำนวนแถวสูงสุดของรายการอันดับ (ผู้บริจาค · ของที่ระลึกที่ถูกเลือก · ของใกล้หมด · กองทุน · แคมเปญ · ขาดตามที่จัดสรร) */
 export const DASHBOARD_TOP_LIMIT = 5;
 /** lot ที่หมดอายุภายในกี่วันนับจากวันนี้ (วันไทย) ถึงนับเป็น "ใกล้หมดอายุ" */
 export const DASHBOARD_EXPIRING_WITHIN_DAYS = 30;
@@ -254,10 +255,67 @@ export interface DashboardDonationsSection {
   trend: DashboardTrendPoint[];
   /** งานค้างทั้งหมดตอนนี้ (ไม่ขึ้นกับช่วง) — ลิงก์ `/donations?status=PENDING` · `/donations?status=CONFIRMED` */
   queue: { pending: DashboardCountAmount; confirmedNotOrdered: DashboardCountAmount };
-  /** ของที่ระลึกที่แจกมากสุด ≤ `DASHBOARD_TOP_LIMIT` — จากรายการที่นับรายรับในช่วง */
+  /** ของที่ระลึกที่ถูกเลือกมากสุด (`donation_items` — ไม่ใช่การแจกของ R5 · SV-ADR-099) ≤ `DASHBOARD_TOP_LIMIT` — จากรายการที่นับรายรับในช่วง */
   topSouvenirs: DashboardTopSouvenir[];
   /** ชิ้นของที่ระลึกรวมของรายการที่นับรายรับในช่วง */
   souvenirQty: number;
+}
+
+// ── กองทุน/แคมเปญ (`T-144` · SV-ADR-099 · สิทธิ์ `donations`) ─────────────────────────────
+
+/** กองทุนของแถวยอด — join กองทุน**ไม่กรองที่ลบ** (ยอดยังผูกกับของเดิม · แบบ R1) · `deleted` = กองทุนถูกลบแล้ว */
+export interface DashboardFundRef {
+  id: string;
+  code: string | null;
+  name: string;
+  deleted: boolean;
+}
+
+/** ยอดนับรายรับของกองทุนหนึ่งในช่วง — ลิงก์ R1 `fundId=<id>` (สถานะ `COUNTED` · ช่วงเดียวกัน) */
+export interface DashboardFundRow extends DashboardCountAmount {
+  fund: DashboardFundRef;
+  /** โปรแกรมปัจจุบันของกองทุน (รายการบริจาคไม่เก็บโปรแกรม — SV-ADR-086) · กองทุนไม่มีโปรแกรม / ชั้นโปรแกรมปิด (SV-ADR-090) = `null` */
+  program: { id: string; name: string } | null;
+}
+
+/**
+ * แคมเปญที่เปิดรับบริจาค = เกณฑ์เดียวกับตัวเลือก `GET /programs/options` (ไม่รวมที่ปิด: แคมเปญเปิด + ไม่ลบ · กองทุนเปิด + ไม่ลบ ·
+ * กองทุนมีโปรแกรม → โปรแกรมไม่ลบ และเปิด (เฉพาะชั้นโปรแกรมเปิด)) · **ไม่กรองวันที่** (REQ-FND-003 ไม่มี logic วันที่ — แสดงอย่างเดียว)
+ */
+export interface DashboardCampaignProgress {
+  id: string;
+  code: string | null;
+  name: string;
+  fund: { id: string; name: string };
+  /** `YYYY-MM-DD` | `null` */
+  startDate: string | null;
+  endDate: string | null;
+  /** DECIMAL ข้อความ · ไม่ตั้งเป้า = `null` */
+  targetAmount: string | null;
+  /** ยอด/จำนวนนับรายรับ**ทุกช่วงเวลา** = `stats.donationTotal` / `stats.donationCount` ของหน้า view แคมเปญ */
+  raised: string;
+  count: number;
+  /** ยอดนับรายรับในช่วงที่เลือก (`donation_date`) */
+  rangeAmount: string;
+  /** `raised / targetAmount × 100` ทศนิยม 1 ตำแหน่ง ปัดครึ่งขึ้น (คิดด้วยสตางค์จำนวนเต็ม · เกิน 100 ได้) · ไม่มีเป้า = `null` */
+  progressPercent: number | null;
+}
+
+/**
+ * ยอดตามกองทุน (รายรับในช่วง = นิยามเดียวกับ `donations.revenue`) + แคมเปญที่เปิดรับบริจาค —
+ * **Σ `byFund` + `otherFunds` + `unassigned` = `donations.revenue`** (ทั้งยอดและจำนวน · รวมด้วยสตางค์จำนวนเต็ม)
+ */
+export interface DashboardFundraisingSection {
+  /** กองทุน (`fund_id` ไม่ว่าง) เรียงยอดมาก → จำนวนมาก → id ≤ `DASHBOARD_TOP_LIMIT` */
+  byFund: DashboardFundRow[];
+  /** กองทุนที่เหลือหลังอันดับ — `fundCount` = จำนวนกองทุนที่รวมไว้ในแถวนี้ */
+  otherFunds: DashboardCountAmount & { fundCount: number };
+  /** ไม่ระบุกองทุน (`fund_id IS NULL`) — ลิงก์ R1 `fundId=none` */
+  unassigned: DashboardCountAmount;
+  /** มีวันสิ้นสุดก่อน (ใกล้สุดก่อน) → ไม่มีวันสิ้นสุด → ชื่อ → id ≤ `DASHBOARD_TOP_LIMIT` */
+  campaigns: DashboardCampaignProgress[];
+  /** แคมเปญที่เปิดรับบริจาคทั้งหมด (เกณฑ์เดียวกับ `campaigns`) */
+  activeCampaignCount: number;
 }
 
 export interface DashboardTopDonor {
@@ -297,6 +355,8 @@ export interface DashboardOrdersSection {
   labelsPending: { count: number; byStatus: DashboardOrderStatusRow[] };
   /** ชั่วโมงเฉลี่ย `confirmedAt` → `shippedAt` ของที่ส่งในช่วง (ทศนิยม 1 ตำแหน่ง) · ไม่มี = `null` */
   avgLeadTimeHours: number | null;
+  /** ออเดอร์ร่างรอของเข้า (ไม่ลบ · SV-ADR-098) = `meta.total` ของ `/orders?status=DRAFT&stock=SHORT` */
+  awaitingStock: { count: number };
 }
 
 export interface DashboardLowStockItem {
@@ -315,8 +375,28 @@ export interface DashboardSouvenirsSection {
   lowStockCount: number;
   /** `OUT` ก่อน แล้วคงเหลือน้อยสุด ≤ `DASHBOARD_TOP_LIMIT` */
   lowStock: DashboardLowStockItem[];
-  /** lot ที่ยังมีของ (`qtyRemaining > 0`) ของสินค้าที่ยังไม่ลบ — `count` หมดอายุวันนี้ถึง +`withinDays` วัน · `expiredCount` เลยวันหมดอายุแล้ว */
+  /**
+   * lot ที่ยังมีของ (`qtyRemaining > 0`) ของสินค้าที่ยังไม่ลบ (ทุกสถานะ) — `count` หมดอายุวันนี้ถึง +`withinDays` วัน · `expiredCount` เลยวันหมดอายุแล้ว
+   * = จำนวนแถว R6 `/reports/stock?tab=lots&expiry=EXPIRING` / `…&expiry=EXPIRED` (ไม่ใส่ตัวกรองสินค้า · `stockLotExpiryOf`)
+   */
   expiringLots: { count: number; expiredCount: number; withinDays: number };
+  /**
+   * ขาดตามที่จัดสรร / pre-order (สินค้าไม่ลบ ทุกสถานะ · SV-ADR-098) — `count` = จำนวนสินค้า = `meta.total` ของ `/souvenirs?allocation=SHORT` ·
+   * `qty` = Σ `shortage` · `items` เรียงขาดมาก → รหัส ≤ `DASHBOARD_TOP_LIMIT`
+   */
+  preorder: { count: number; qty: number; items: DashboardShortageItem[] };
+}
+
+/** ของที่ระลึกที่ขาดตามที่จัดสรร (SV-ADR-098) — `shortage` = `allocatedRemaining − stockOnHand` (> 0) */
+export interface DashboardShortageItem {
+  id: string;
+  code: string;
+  name: string;
+  unit: string | null;
+  stockOnHand: number;
+  /** Σ ที่จัดสรรให้แคมเปญแล้วยังไม่ใช้ (ทุกแคมเปญ) */
+  allocatedRemaining: number;
+  shortage: number;
 }
 
 /** นิยามเดียวกับ `GET /chat/unread` (`threads` · `messages`) */
@@ -330,6 +410,8 @@ export interface DashboardSummaryView {
   /** ISO เวลาที่คำนวณ (ตัวเลขสด ไม่ cache) */
   generatedAt: string;
   donations: DashboardDonationsSection | null;
+  /** สิทธิ์ `donations` (ชื่อกองทุน/แคมเปญเห็นใน list รายการบริจาคอยู่แล้ว — SV-ADR-099) */
+  fundraising: DashboardFundraisingSection | null;
   donors: DashboardDonorsSection | null;
   orders: DashboardOrdersSection | null;
   souvenirs: DashboardSouvenirsSection | null;
