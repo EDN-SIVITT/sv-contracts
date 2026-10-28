@@ -1,4 +1,5 @@
 import type { DonorStatus } from './donors';
+import type { FundraisingRef } from './fundraising';
 import { parseMoneyToSatang } from './money';
 import {
   ORDER_CANCEL_REASON_MAX_LENGTH,
@@ -323,9 +324,40 @@ export interface DonationListQuery {
   dateTo?: string;
   /** ลิงก์จากหน้าผู้บริจาค (`/donations?donorId=`) */
   donorId?: string;
+  /** กองทุนในโปรแกรมนี้ (ตามโปรแกรม**ปัจจุบัน**ของกองทุน — รายการไม่เก็บโปรแกรม · SV-ADR-086) — `T-126` */
+  programId?: string;
+  /** id ของกองทุน หรือ `DONATION_FUND_FILTER_NONE` (`'none'`) = ยังไม่ระบุกองทุน (จัดข้อมูลเดิม) — `T-126` */
+  fundId?: string;
+  campaignId?: string;
   page?: number;
   perPage?: number;
 }
+
+/** ค่าพิเศษของตัวกรอง `fundId` — รายการที่ยังไม่ระบุกองทุน (`fund_id IS NULL` · ข้อมูลก่อน `0029` / LINE OA) */
+export const DONATION_FUND_FILTER_NONE = 'none';
+
+/**
+ * กองทุนที่รับบริจาคของรายการ (`SV-CR-006` · SV-ADR-088 · `T-126`) — ref ของกองทุน + โปรแกรม (ปัจจุบัน) ของกองทุน ·
+ * ของที่ปิดใช้งาน/ถูกลบไปแล้วยังแสดงชื่อ (`isActive` · `deleted` — ป้าย "ปิดใช้งาน") · `null` ในรายการ = ยังไม่ระบุกองทุน ·
+ * `program: null` = กองทุนยังไม่จัดโปรแกรม (`T-131` · SV-ADR-090)
+ */
+export type DonationFundView = FundraisingRef & { program: FundraisingRef | null };
+
+/** แคมเปญของรายการ (เป็นของกองทุนในรายการเสมอ — API ตรวจ) · `year` = ปี ค.ศ. (ข้อมูลประกอบ) · `null` = ไม่ระบุแคมเปญ */
+export type DonationCampaignView = FundraisingRef & { year: number | null };
+
+/**
+ * เหตุผลใน `details.reason` ของ 422 `DONATION_FUND_UNAVAILABLE` / `DONATION_CAMPAIGN_UNAVAILABLE` (ผูก**ใหม่**เท่านั้น — ค่าเดิมของรายการไม่ตรวจ) ·
+ * `PROGRAM_INACTIVE` = โปรแกรมของกองทุนปิดใช้งาน/ถูกลบ (เฉพาะ `DONATION_FUND_UNAVAILABLE`) · แคมเปญใหม่ในกองทุนที่ปิดอยู่ = `DONATION_FUND_UNAVAILABLE`
+ */
+export const DonationFundraisingUnavailableReason = {
+  NOT_FOUND: 'NOT_FOUND',
+  DELETED: 'DELETED',
+  INACTIVE: 'INACTIVE',
+  PROGRAM_INACTIVE: 'PROGRAM_INACTIVE',
+} as const;
+export type DonationFundraisingUnavailableReason =
+  (typeof DonationFundraisingUnavailableReason)[keyof typeof DonationFundraisingUnavailableReason];
 
 /** แถวในหน้า list (`GET /donations`) */
 export interface DonationListItemView {
@@ -348,6 +380,10 @@ export interface DonationListItemView {
   /** หมายเหตุ ≤ `DONATION_NOTE_MAX_LENGTH` — คอลัมน์ "หมายเหตุ" ของ list (ตัดบรรทัดเดียว · คำสั่งเจ้าของ) · `null` = ไม่มี (`T-087`) */
   note: string | null;
   donor: DonationDonorView;
+  /** กองทุน (+ โปรแกรม) ที่รับบริจาค · `null` = ยังไม่ระบุ (ข้อมูลเดิม / LINE OA · Q-086) — join ใน query เดียวกับ list (`T-126`) */
+  fund: DonationFundView | null;
+  /** แคมเปญ · `null` = ไม่ระบุแคมเปญ */
+  campaign: DonationCampaignView | null;
   /**
    * ออเดอร์ active ของรายการนี้ (`orders.source_donation_id` ที่ไม่ `CANCELLED`/ไม่ถูกลบ · `T-108` · `T-113` SV-ADR-077) เรียง `splitNo` —
    * มีค่าเฉพาะ `ORDERED` (≥ 1 ใบ · แยกได้ ≤ `DONATION_ORDER_SPLIT_MAX`) · `[]` = ยังไม่ออก/ยกเลิกทั้งหมดแล้ว
@@ -453,6 +489,17 @@ export interface DonationCreateInput {
   recipient?: OrderRecipientInput;
   /** หมายเหตุหลักฐานการโอน ≤ `DONATION_SLIP_NOTE_MAX_LENGTH` (หลัง trim · เกิน → 422 `slipNote`) · `''` = ล้าง */
   slipNote?: string;
+  /**
+   * กองทุนที่รับบริจาค (`T-126` · SV-ADR-088) — **ไม่บังคับ** (Q-086) · ไม่ส่ง = ไม่มี (สร้าง) / คงเดิม (แก้ไข) · `null` = ล้าง ·
+   * ผูกใหม่ต้องเลือกได้ (มีอยู่ · ไม่ถูกลบ · เปิดใช้งาน · โปรแกรมเปิด) ไม่งั้น 422 `DONATION_FUND_UNAVAILABLE` `{ field: 'fundId', reason }` ·
+   * ค่าเดิมของรายการที่ปิดไปแล้วส่งซ้ำได้ · **ไม่ใช่ช่องการเงิน** (CONFIRMED เปลี่ยนได้ · ORDERED แก้ไม่ได้ทั้งใบ)
+   */
+  fundId?: string | null;
+  /**
+   * แคมเปญ — ต้องเป็นของ `fundId` (ค่าหลังรวมค่าเดิม) ไม่งั้น 422 `DONATION_CAMPAIGN_FUND_MISMATCH` `{ field: 'campaignId' }` (รวมกรณีมีแคมเปญแต่ไม่มีกองทุน) ·
+   * ผูกใหม่ต้องเปิดใช้งาน (และกองทุน/โปรแกรมของมันเปิด) ไม่งั้น 422 `DONATION_CAMPAIGN_UNAVAILABLE` / `DONATION_FUND_UNAVAILABLE` · ไม่ส่ง = คงเดิม · `null` = ล้าง
+   */
+  campaignId?: string | null;
   items: DonationItemInput[];
 }
 

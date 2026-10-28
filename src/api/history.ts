@@ -3,14 +3,22 @@ import { PermissionSubject } from '../permissions';
 import type { ApiListResponse } from './response';
 
 /**
- * "ประวัติการแก้ไข" ของรายการ (`T-107` · SV-ADR-071) — เมนูรายการบริจาค · ออเดอร์ · ของที่ระลึก
+ * "ประวัติการแก้ไข" ของรายการ (`T-107` · SV-ADR-071) — เมนูรายการบริจาค · ออเดอร์ · ของที่ระลึก · โปรแกรม · กองทุน · แคมเปญ (`T-125`)
  * อ่านจาก `audit_logs` (ไม่มีตารางใหม่ · อยู่นานเท่าระยะเก็บ log) → API แปลงเป็น entry ที่อ่านง่าย: ใคร · ทำอะไร · เมื่อไร · ช่องไหนเปลี่ยน
  * `GET /<เมนู>/history` = ทุกรายการของเมนู (รวมที่ลบ) · `GET /<เมนู>/:id/history` = รายการเดียว (id ที่ลบแล้วยังเปิดได้) · สิทธิ์ = READ_ONLY ของเมนูนั้น
  * ⚠️ ไม่มีค่าภายใน (storage key · ip · user agent · trace) — ช่องที่ส่งมาเฉพาะ whitelist ต่อเมนู (`RECORD_HISTORY_FIELDS`)
  */
 
 /** เมนูที่มีประวัติการแก้ไข = permission subject ของเมนู (สิทธิ์ READ_ONLY ของเมนูนั้น) */
-export const RECORD_HISTORY_MENUS = [PermissionSubject.DONATIONS, PermissionSubject.ORDERS, PermissionSubject.SOUVENIRS] as const;
+export const RECORD_HISTORY_MENUS = [
+  PermissionSubject.DONATIONS,
+  PermissionSubject.ORDERS,
+  PermissionSubject.SOUVENIRS,
+  // โปรแกรม · กองทุน · แคมเปญ (`SV-CR-006` · `T-125`) — ช่อง `status` = `FundraisingStatus` (จาก `isActive`)
+  PermissionSubject.PROGRAMS,
+  PermissionSubject.FUNDS,
+  PermissionSubject.CAMPAIGNS,
+] as const;
 export type RecordHistoryMenu = (typeof RECORD_HISTORY_MENUS)[number];
 
 /** ตัวกรอง "การกระทำ" ของหน้า history (คอลัมน์ `audit_logs.action`) */
@@ -57,7 +65,7 @@ export type RecordHistoryFieldKind = (typeof RECORD_HISTORY_FIELD_KINDS)[number]
 /** ชื่อช่องที่ส่งได้ต่อเมนู (whitelist) — หน้าเว็บแปลด้วย `history.field.<field>` (ต้องครบทั้ง th/en) */
 export const RECORD_HISTORY_FIELDS = {
   [PermissionSubject.DONATIONS]: [
-    'status', 'donor', 'donationDate', 'amount', 'recipientName', 'recipientPhone', 'recipientAddress',
+    'status', 'donor', 'donationDate', 'amount', 'fund', 'campaign', 'recipientName', 'recipientPhone', 'recipientAddress',
     'note', 'slipNote', 'rejectReason', 'order', 'reason', 'items', 'totalValue', 'totalDonationThreshold',
   ],
   [PermissionSubject.ORDERS]: [
@@ -68,6 +76,10 @@ export const RECORD_HISTORY_FIELDS = {
     'code', 'name', 'category', 'unit', 'value', 'donationThreshold', 'status', 'lowStockThreshold', 'description',
     'lotNo', 'receivedAt', 'qtyReceived', 'qtyRemaining', 'unitCost', 'expiresAt', 'lotNote',
   ],
+  /** `program` / `fund` = "รหัส · ชื่อ" ของแม่ (เทียบด้วย id) · รายการบริจาค `fund` / `campaign` แบบเดียวกัน (`T-126`) */
+  [PermissionSubject.PROGRAMS]: ['code', 'name', 'description', 'status'],
+  [PermissionSubject.FUNDS]: ['code', 'name', 'program', 'description', 'status'],
+  [PermissionSubject.CAMPAIGNS]: ['code', 'name', 'fund', 'description', 'year', 'startDate', 'endDate', 'targetAmount', 'status'],
 } as const satisfies Record<RecordHistoryMenu, readonly string[]>;
 export type RecordHistoryField = (typeof RECORD_HISTORY_FIELDS)[RecordHistoryMenu][number];
 
@@ -103,7 +115,7 @@ export interface RecordHistoryEntry {
   /** id ของ audit log */
   id: string;
   action: AuditAction;
-  /** ชนิดของข้อมูลที่ถูกเขียน (`donation` `donation_status` `donation_slip` · `order` `order_status` `order_slip` `order_label` · `souvenir` `souvenir_image` `souvenir_lot`) */
+  /** ชนิดของข้อมูลที่ถูกเขียน (`donation` `donation_status` `donation_slip` · `order` `order_status` `order_slip` `order_label` · `souvenir` `souvenir_image` `souvenir_lot` · `program` `fund` `campaign`) */
   entity: string;
   event: RecordHistoryEvent;
   /** `id = null` = ไม่ใช่ผู้ใช้ CMS (ระบบ / LINE) · `name = null` = ไม่ทราบ */
@@ -117,7 +129,7 @@ export interface RecordHistoryEntry {
 
 /** query ของ `GET /<เมนู>/history` และ `GET /<เมนู>/:id/history` (`q` ใช้เฉพาะแบบรวม) */
 export interface RecordHistoryQuery {
-  /** ค้นเลขที่ (รายการบริจาค/ออเดอร์) · รหัส/ชื่อ (ของที่ระลึก) — รวมรายการที่ลบแล้ว */
+  /** ค้นเลขที่ (รายการบริจาค/ออเดอร์) · รหัส/ชื่อ (ของที่ระลึก · โปรแกรม · กองทุน · แคมเปญ) — รวมรายการที่ลบแล้ว */
   q?: string;
   action?: RecordHistoryAction;
   /** ช่วงวันที่ทำ (`YYYY-MM-DD` เวลาไทย · รวมปลาย) */

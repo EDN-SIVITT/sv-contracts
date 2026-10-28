@@ -21,6 +21,8 @@ export const SettingGroup = {
   ORDER: 'order',
   /** รายการบริจาค (e-Donation · `SV-CR-005` ข้อ 3 · SV-ADR-053 · `T-084`) — รูปแบบเลขที่รายการบริจาค */
   DONATION: 'donation',
+  /** โครงสร้างการรับบริจาค (e-Donation · `SV-CR-007` · SV-ADR-090 · `T-131`) — เปิด/ปิดชั้นโปรแกรม (3 ชั้น ↔ 4 ชั้น) */
+  FUNDRAISING: 'fundraising',
 } as const;
 export type SettingGroup = (typeof SettingGroup)[keyof typeof SettingGroup];
 
@@ -153,6 +155,11 @@ export const SettingKey = {
   DONATION_STATUS_COLOR_CONFIRMED: 'donation.statusColorConfirmed',
   DONATION_STATUS_COLOR_ORDERED: 'donation.statusColorOrdered',
   DONATION_STATUS_COLOR_REJECTED: 'donation.statusColorRejected',
+  /**
+   * ชั้นโปรแกรม (`SV-CR-007` · SV-ADR-090 · `T-131`): `true` = 4 ชั้น โปรแกรม → กองทุน → แคมเปญ → รายการบริจาค · `false` = 3 ชั้น (ไม่มีเมนู/ช่องโปรแกรม) ·
+   * ค่าที่ `0030` ใส่ = `true` เมื่อมีโปรแกรมอยู่แล้ว (site เดิม) ไม่งั้น `false` (site ใหม่) · ปิดแล้วโปรแกรม/ความสัมพันธ์/สิทธิ์เดิมยังอยู่ครบ · ทุกคนรู้ค่าผ่าน `GET /auth/me` `features`
+   */
+  FUNDRAISING_PROGRAM_ENABLED: 'fundraising.programEnabled',
 } as const;
 export type SettingKey = (typeof SettingKey)[keyof typeof SettingKey];
 
@@ -172,6 +179,21 @@ export const PAGE_LOADING_SCREEN_DEFAULT = true;
 /** การแสดงผลของ CMS ที่ผู้ใช้ทุกคนได้จาก `GET /auth/me` (ไม่ต้องมีสิทธิ์เมนูตั้งค่า) — SV-ADR-055 */
 export interface UiPreferences {
   pageLoadingScreen: boolean;
+}
+
+/**
+ * ค่าของ `fundraising.programEnabled` เมื่อ**ยังไม่มีแถว** (ยังไม่รัน `0030` — `funds.program_id` ยัง NOT NULL) = เปิด = พฤติกรรมก่อนมีสวิตช์ (SV-ADR-090)
+ * ค่าเริ่มต้นของ site ใหม่ (`false`) อยู่ใน `0030` / install SQL — ไม่ใช่ค่านี้
+ */
+export const PROGRAM_LAYER_FALLBACK_ENABLED = true;
+
+/**
+ * ฟีเจอร์ที่องค์กรเปิด/ปิดได้ในเมนูตั้งค่า (Feature Configuration — แยกจากสิทธิ์ผู้ใช้ · ต้องผ่านทั้งคู่) · ทุกคนที่ login ได้จาก `GET /auth/me` — SV-ADR-090
+ * หน้าเว็บใช้ซ่อนเมนู/ช่อง แต่ **API ตรวจซ้ำเสมอ**
+ */
+export interface SystemFeatures {
+  /** ชั้นโปรแกรม (`fundraising.programEnabled`) */
+  programEnabled: boolean;
 }
 
 export const SESSION_IDLE_DEFAULT_MINUTES = 30;

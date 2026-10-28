@@ -1,3 +1,5 @@
+import type { SouvenirEligibilityMeta } from './fundraising-souvenirs';
+import type { ApiMeta } from './response';
 import { formatSequenceCode } from './sequence-code';
 
 /**
@@ -169,6 +171,19 @@ export interface SouvenirListQuery {
   sort?: SouvenirSort;
   page?: number;
   perPage?: number;
+  /**
+   * บริบทของ picker ในฟอร์มรายการบริจาค (`T-132` · SV-ADR-091) — ส่งอย่างน้อย 1 ช่อง = กรองตามเงื่อนไขของที่ระลึก + `meta.eligibility` ·
+   * ไม่ส่งทั้ง 3 = เดิมทุกอย่าง · `eligibleCampaignId` = ใช้กองทุนจริงของแคมเปญ · `eligibleDate` `YYYY-MM-DD` ไม่ส่ง = วันนี้ (เวลาไทย) ·
+   * `RULES` = เฉพาะของในกฎที่มีผลวันนั้น (+ `eligibleThreshold`) · `NONE` = รายการว่าง · `LEGACY` = เดิม
+   */
+  eligibleFundId?: string;
+  eligibleCampaignId?: string;
+  eligibleDate?: string;
+}
+
+/** meta ของ `GET /souvenirs` — `eligibility` มีเมื่อส่ง `eligible*` มา (`T-132`) */
+export interface SouvenirListMeta extends ApiMeta {
+  eligibility?: SouvenirEligibilityMeta;
 }
 
 /** แถวในหน้า list (`GET /souvenirs`) */
@@ -199,10 +214,16 @@ export interface SouvenirListItemView {
   imageVersion: string | null;
   createdAt: string;
   updatedAt: string;
+  /**
+   * เกณฑ์ยอดบริจาค/ชิ้นตามกฎของบริบท (`eligible*` · `RULES`) — ใช้แทน `donationThreshold` ในฟอร์มรายการบริจาค · ไม่มีบริบท/`LEGACY` = `null` (`T-132`)
+   */
+  eligibleThreshold: string | null;
+  /** ที่แคมเปญยังใช้ได้ (นโยบาย `ALLOCATED` · `T-133`) · อื่น ๆ = `null` */
+  campaignAvailable: number | null;
 }
 
-/** หน้า view (`GET /souvenirs/:id`) */
-export interface SouvenirView extends SouvenirListItemView {
+/** หน้า view (`GET /souvenirs/:id`) — ไม่มีบริบทของ picker (`eligibleThreshold` / `campaignAvailable` อยู่เฉพาะ list) */
+export interface SouvenirView extends Omit<SouvenirListItemView, 'eligibleThreshold' | 'campaignAvailable'> {
   description: string | null;
   /** รูปทั้งหมดเรียงแล้ว (`sortOrder` 0..n-1) · ตัวแรก = รูปหลัก (version เดียวกับ `imageVersion`) · ไม่มีรูป = `[]` (`T-100`) */
   images: SouvenirImageView[];

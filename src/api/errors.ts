@@ -130,6 +130,37 @@ export const ErrorCode = {
   SHIPPING_CARRIER_NAME_TAKEN: 'SHIPPING_CARRIER_NAME_TAKEN',
   /** ลบขนส่งที่ยังมีออเดอร์ (ที่ยังไม่ลบ) อ้างอยู่ — 409 `details { orderCount }` · ให้ปิดใช้งานแทน */
   SHIPPING_CARRIER_IN_USE: 'SHIPPING_CARRIER_IN_USE',
+  // ── โปรแกรม → กองทุน → แคมเปญ (`SV-CR-006` · FT-18 · SV-ADR-086 · `T-125`) — ชื่อ/รหัสซ้ำ = 422 `details { field, name | code }` (ไม่สนตัวพิมพ์ · เฉพาะแถวที่ยังไม่ลบ) ──
+  /** ชื่อโปรแกรมซ้ำ (ทั้งระบบ) */
+  PROGRAM_NAME_TAKEN: 'PROGRAM_NAME_TAKEN',
+  /** รหัสโปรแกรมซ้ำ */
+  PROGRAM_CODE_TAKEN: 'PROGRAM_CODE_TAKEN',
+  /** ลบโปรแกรมที่ยังมีกองทุน (ที่ยังไม่ลบ) — 409 `details { fundCount }` · ให้ปิดใช้งานแทน */
+  PROGRAM_IN_USE: 'PROGRAM_IN_USE',
+  /** ชื่อกองทุนซ้ำในโปรแกรมเดียวกัน (ต่างโปรแกรมซ้ำได้) */
+  FUND_NAME_TAKEN: 'FUND_NAME_TAKEN',
+  /** รหัสกองทุนซ้ำ (ทั้งระบบ) */
+  FUND_CODE_TAKEN: 'FUND_CODE_TAKEN',
+  /** ลบกองทุนที่ยังมีแคมเปญหรือรายการบริจาค (ที่ยังไม่ลบ) อ้าง — 409 `details { campaignCount, donationCount }` · ให้ปิดใช้งานแทน */
+  FUND_IN_USE: 'FUND_IN_USE',
+  /** `programId` ไม่มีอยู่หรือถูกลบ (ปิดใช้งานเลือกได้) — 422 `details { field: 'programId' }` */
+  FUND_PROGRAM_NOT_FOUND: 'FUND_PROGRAM_NOT_FOUND',
+  /** เปิดชั้นโปรแกรมอยู่แต่สร้างกองทุนโดยไม่เลือกโปรแกรม — 422 `details { field: 'programId' }` (`T-131` · SV-ADR-090 · แก้ไขล้างโปรแกรมได้) */
+  FUND_PROGRAM_REQUIRED: 'FUND_PROGRAM_REQUIRED',
+  /** ชั้นโปรแกรมปิดอยู่ในเมนูตั้งค่า (`fundraising.programEnabled = false`) — 403 ทุก endpoint ของเมนูโปรแกรม ยกเว้น `GET /programs/options` (`T-131` · SV-ADR-090) */
+  PROGRAM_LAYER_DISABLED: 'PROGRAM_LAYER_DISABLED',
+  /** ชื่อแคมเปญซ้ำในกองทุนเดียวกัน */
+  CAMPAIGN_NAME_TAKEN: 'CAMPAIGN_NAME_TAKEN',
+  /** รหัสแคมเปญซ้ำ (ทั้งระบบ) */
+  CAMPAIGN_CODE_TAKEN: 'CAMPAIGN_CODE_TAKEN',
+  /** ลบแคมเปญที่ยังมีรายการบริจาค (ที่ยังไม่ลบ) อ้าง — 409 `details { donationCount }` · ให้ปิดใช้งานแทน */
+  CAMPAIGN_IN_USE: 'CAMPAIGN_IN_USE',
+  /** `fundId` ไม่มีอยู่หรือถูกลบ (ปิดใช้งานเลือกได้) — 422 `details { field: 'fundId' }` */
+  CAMPAIGN_FUND_NOT_FOUND: 'CAMPAIGN_FUND_NOT_FOUND',
+  /** ย้ายแคมเปญไปกองทุนอื่นขณะมีรายการบริจาค (ที่ยังไม่ลบ) อ้าง — 409 `details { donationCount }` (กันรายการบริจาคขัดกับกองทุน) */
+  CAMPAIGN_HAS_DONATIONS: 'CAMPAIGN_HAS_DONATIONS',
+  /** วันสิ้นสุดก่อนวันเริ่ม — 422 `details { field: 'endDate', startDate, endDate }` */
+  CAMPAIGN_DATE_RANGE_INVALID: 'CAMPAIGN_DATE_RANGE_INVALID',
   // ── รายการบริจาค (`SV-CR-005` ข้อ 3 · FT-17 · SV-ADR-053 · `T-084`) ──
   /** มูลค่าของที่ระลึกรวม (Σ qty × มูลค่าปัจจุบัน) เกินยอดบริจาค — 422 `details { amount, souvenirTotal }` (ข้อความทศนิยม 2 ตำแหน่ง) */
   DONATION_SOUVENIR_OVER_AMOUNT: 'DONATION_SOUVENIR_OVER_AMOUNT',
@@ -154,6 +185,47 @@ export const ErrorCode = {
    * `NOT_IMAGE` ไม่ใช่รูปและไม่ใช่ PDF (`accepted`) · `FORMAT` รูปชนิดอื่น · `DIMENSIONS` · `CORRUPT` · `TOO_MANY` ครบ `PAYMENT_SLIP_FILES_MAX` แล้ว (`max`) (`T-112`)
    */
   DONATION_SLIP_INVALID: 'DONATION_SLIP_INVALID',
+  /**
+   * กองทุนที่ผูก**ใหม่**กับรายการบริจาคเลือกไม่ได้ (`T-126` · SV-ADR-088) — 422 `details { field: 'fundId', fundId, reason }` ·
+   * `reason` (`DonationFundraisingUnavailableReason`): `NOT_FOUND` · `DELETED` · `INACTIVE` · `PROGRAM_INACTIVE` (โปรแกรมของกองทุนปิด/ถูกลบ) ·
+   * รวมกรณีเลือกแคมเปญใหม่ในกองทุนที่ปิดอยู่ · ค่าเดิมของรายการไม่ตรวจ (บันทึกซ้ำได้)
+   */
+  DONATION_FUND_UNAVAILABLE: 'DONATION_FUND_UNAVAILABLE',
+  /** แคมเปญที่ผูก**ใหม่**เลือกไม่ได้ — 422 `details { field: 'campaignId', campaignId, reason }` · `reason`: `NOT_FOUND` · `DELETED` · `INACTIVE` */
+  DONATION_CAMPAIGN_UNAVAILABLE: 'DONATION_CAMPAIGN_UNAVAILABLE',
+  /**
+   * แคมเปญไม่ใช่ของกองทุนที่เลือก (ค่าหลังรวมค่าเดิม) หรือมีแคมเปญแต่ไม่มีกองทุน — 422 `details { field: 'campaignId', campaignId, fundId, campaignFundId }`
+   * (`fundId` = กองทุนที่เลือก `null` ได้ · `campaignFundId` = กองทุนจริงของแคมเปญ `null` = ยังไม่ได้อ่าน) · ตรวจเสมอเมื่อกองทุนหรือแคมเปญเปลี่ยน
+   */
+  DONATION_CAMPAIGN_FUND_MISMATCH: 'DONATION_CAMPAIGN_FUND_MISMATCH',
+  /**
+   * ของที่ระลึกไม่อยู่ในเงื่อนไขของกองทุน/แคมเปญ ณ วันที่บริจาค (`SV-CR-008` · `T-132` · SV-ADR-091) หรือแคมเปญตั้ง "ไม่แจกของ" —
+   * 422 `details { souvenirId, code, name, mode, source }` (`mode` = `SouvenirEligibilityMode` `RULES`/`NONE` · `source` = `SouvenirRuleSource`) ·
+   * แถวเดิมจำนวนไม่เพิ่มในบริบทเดิมเก็บได้ · เปลี่ยนกองทุน/แคมเปญ/วันที่ = ตรวจของเดิมใหม่ทั้งชุด
+   */
+  DONATION_SOUVENIR_NOT_ELIGIBLE: 'DONATION_SOUVENIR_NOT_ELIGIBLE',
+  // ── จัดสรรสต็อกให้แคมเปญ (`SV-CR-008` ข้อ 2 · `T-133` · SV-ADR-092) ──
+  /**
+   * ตัดสต็อก (ยืนยันออเดอร์) เกินโควตาของแคมเปญ/สต็อกส่วนกลางที่ยังไม่จัดสรร — 422 `details { souvenirId, code, name, requested, available, onHand, campaignId, policy }` ·
+   * `ALLOCATED` ใช้ได้ ≤ remaining · `SHARED` ≤ remaining + free · ไม่มีแคมเปญ ≤ free (rollback ทั้งคำขอ · สต็อกจริงไม่พอ = `STOCK_INSUFFICIENT` มาก่อน)
+   */
+  STOCK_ALLOCATION_INSUFFICIENT: 'STOCK_ALLOCATION_INSUFFICIENT',
+  /** เพิ่มโควตาแคมเปญเกินสต็อกที่ยังไม่จัดสรร (free) — 422 `details { souvenirId, requested, free }` */
+  CAMPAIGN_ALLOCATION_EXCEEDS_FREE: 'CAMPAIGN_ALLOCATION_EXCEEDS_FREE',
+  /** ลดโควตาแคมเปญต่ำกว่าที่ใช้ไปแล้ว (หรือติดลบ) — 422 `details { souvenirId, allocated, used, requested }` */
+  CAMPAIGN_ALLOCATION_BELOW_USED: 'CAMPAIGN_ALLOCATION_BELOW_USED',
+  /** ลบแคมเปญที่ยังกันของไว้ (remaining > 0) — 409 `details { remaining }` · คืนส่วนที่ไม่ใช้ก่อน */
+  CAMPAIGN_HAS_ALLOCATIONS: 'CAMPAIGN_HAS_ALLOCATIONS',
+  // ── ช่องทางติดต่อ (`SV-CR-009` ข้อ 3 · FT-20 · SV-ADR-094 · `T-136`) — ค่าผิดกฎตามประเภทใช้ `VALIDATION_FAILED { field, reason }` · ไอคอนใช้ `FILE_*` / `IMAGE_DIMENSIONS_INVALID` ──
+  /** ไม่พบช่องทางติดต่อ (ไม่มี/ถูกลบ/id ไม่ใช่ตัวเลข) — 404 `details { id }` */
+  CONTACT_CHANNEL_NOT_FOUND: 'CONTACT_CHANNEL_NOT_FOUND',
+  /** เพิ่มเมื่อมีช่องทาง (ที่ยังไม่ลบ) ครบ `CONTACT_CHANNELS_MAX` แล้ว — 422 `details { max }` (นับใต้ล็อก) */
+  CONTACT_CHANNELS_LIMIT: 'CONTACT_CHANNELS_LIMIT',
+  /** ลำดับที่ส่งมาไม่ใช่ชุด id ครบของแถวที่ยังไม่ลบ (ขาด · เกิน · ซ้ำ · ถูกลบ) — 422 `details { field: 'ids', reason }` (`ContactChannelOrderProblem`) · กันลากวางชนกัน */
+  CONTACT_CHANNEL_ORDER_INVALID: 'CONTACT_CHANNEL_ORDER_INVALID',
+  // ── รายงาน (`SV-CR-009` ข้อ 2 · FT-19 · SV-ADR-095/096 · `T-138`) ──
+  /** ส่งออกรายงานเกิน `REPORT_EXPORT_MAX_ROWS` แถว — 422 `details { limit, total }` (นับก่อนดึงแถว · ให้กรองแคบลง) */
+  REPORT_TOO_MANY_ROWS: 'REPORT_TOO_MANY_ROWS',
   /** ออกเลขที่รายการบริจาคไม่สำเร็จ — เลขที่ประกอบได้ชนกับเลขเดิมติดกันหลายครั้ง (ตรวจคำนำหน้า/จำนวนหลักในเมนูตั้งค่า) — 409 `details { attempts }` */
   DONATION_NO_CONFLICT: 'DONATION_NO_CONFLICT',
   /** ใช้กับ validation error ทั่วไปที่ไม่มี code เฉพาะ */
