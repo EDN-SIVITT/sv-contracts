@@ -237,6 +237,13 @@ export const ErrorCode = {
   REPORT_TOO_MANY_ROWS: 'REPORT_TOO_MANY_ROWS',
   /** ออกเลขที่รายการบริจาคไม่สำเร็จ — เลขที่ประกอบได้ชนกับเลขเดิมติดกันหลายครั้ง (ตรวจคำนำหน้า/จำนวนหลักในเมนูตั้งค่า) — 409 `details { attempts }` */
   DONATION_NO_CONFLICT: 'DONATION_NO_CONFLICT',
+  // ── หน้า LINE OA ผู้บริจาค 4 เมนู (`SV-CR-012` · SV-ADR-103/106) ──
+  /** แจ้งบริจาคพร้อมของที่ระลึกแต่ในบัญชียังไม่มีที่อยู่จัดส่ง — 422 `details { field: 'address' }` (ไปเพิ่มที่อยู่ในหน้าแก้ไขข้อมูลก่อน) */
+  DONATION_RECIPIENT_ADDRESS_REQUIRED: 'DONATION_RECIPIENT_ADDRESS_REQUIRED',
+  /** แจ้งบริจาคจาก LINE OA: ของที่เลือกพร้อมส่งไม่พอในบริบทนั้น (คงเหลือ/โควตาแคมเปญ) — 422 `details { souvenirId, name, requested, available }` (CMS ไม่ใช้กฎนี้) */
+  DONATION_SOUVENIR_OUT_OF_STOCK: 'DONATION_SOUVENIR_OUT_OF_STOCK',
+  /** ให้คะแนนออเดอร์ที่ยังไม่ "รับสินค้าแล้ว" — 409 `details { status }` */
+  ORDER_RATING_NOT_ALLOWED: 'ORDER_RATING_NOT_ALLOWED',
   /** ใช้กับ validation error ทั่วไปที่ไม่มี code เฉพาะ */
   VALIDATION_FAILED: 'VALIDATION_FAILED',
   NOT_FOUND: 'NOT_FOUND',

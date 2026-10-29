@@ -24,6 +24,7 @@ export * from './api/fundraising-souvenirs';
 export * from './api/contact-channels';
 export * from './api/ref-no-colors';
 export * from './api/liff';
+export * from './api/liff-donor';
 export * from './api/sms';
 export * from './api/session';
 export * from './api/history';

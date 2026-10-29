@@ -1,5 +1,6 @@
 import type { DonationStatus, PaymentSlipFileView } from './donations';
 import type { DonorAddressFormat, DonorAddressView, DonorStatus } from './donors';
+import type { OrderRatingView } from './liff-donor';
 import type { ApiListResponse } from './response';
 import { formatSequenceCode } from './sequence-code';
 import { SettingKey } from './settings';
@@ -431,6 +432,8 @@ export interface OrderView extends Omit<OrderListItemView, 'awaitingStock'> {
   updatedBy: OrderActorView | null;
   /** ใบอื่นในชุดแยกเดียวกัน (`sourceDonation.batchNo` เดียวกัน · ไม่รวมใบนี้ · เรียง `splitNo`) · ไม่ได้แยก/ไม่ได้ออกจากรายการบริจาค = `[]` (`T-113`) */
   siblings: OrderSplitSiblingView[];
+  /** คะแนนความพึงพอใจที่ผู้รับให้ทาง LINE OA (`SV-CR-012` · SV-ADR-106) · ยังไม่ให้ = `null` */
+  rating: OrderRatingView | null;
 }
 
 /**

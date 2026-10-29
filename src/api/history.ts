@@ -57,6 +57,9 @@ export const RecordHistoryEvent = {
   /** ผู้บริจาคผูก LINE ผ่าน LINE OA (`summary.ref` = ชื่อ LINE) · เจ้าหน้าที่ยกเลิกการผูก (`T-148`) */
   LINE_LINKED: 'LINE_LINKED',
   LINE_UNLINKED: 'LINE_UNLINKED',
+  /** ผู้รับให้คะแนนความพึงพอใจครั้งแรก / แก้คะแนนทาง LINE OA (entity `order_rating` · ช่อง `rating` `comment` · `T-153`) */
+  RATING_ADDED: 'RATING_ADDED',
+  RATING_UPDATED: 'RATING_UPDATED',
 } as const;
 export type RecordHistoryEvent = (typeof RecordHistoryEvent)[keyof typeof RecordHistoryEvent];
 
@@ -76,6 +79,7 @@ export const RECORD_HISTORY_FIELDS = {
   [PermissionSubject.ORDERS]: [
     'status', 'donor', 'sourceDonation', 'recipientName', 'recipientPhone', 'recipientAddress', 'shippingCarrier',
     'trackingNo', 'note', 'cancelReason', 'donationAmount', 'donationDate', 'slipNote', 'items', 'totalValue', 'totalDonationThreshold',
+    'rating', 'comment',
   ],
   [PermissionSubject.SOUVENIRS]: [
     'code', 'name', 'category', 'unit', 'value', 'donationThreshold', 'status', 'lowStockThreshold', 'description',
@@ -122,7 +126,7 @@ export interface RecordHistoryEntry {
   /** id ของ audit log */
   id: string;
   action: AuditAction;
-  /** ชนิดของข้อมูลที่ถูกเขียน (`donation` `donation_status` `donation_slip` · `order` `order_status` `order_slip` `order_label` · `souvenir` `souvenir_image` `souvenir_lot` · `program` `fund` `campaign` · `donor` `donor_avatar`) */
+  /** ชนิดของข้อมูลที่ถูกเขียน (`donation` `donation_status` `donation_slip` · `order` `order_status` `order_slip` `order_label` `order_rating` · `souvenir` `souvenir_image` `souvenir_lot` · `program` `fund` `campaign` · `donor` `donor_avatar`) */
   entity: string;
   event: RecordHistoryEvent;
   /** `id = null` = ไม่ใช่ผู้ใช้ CMS (ระบบ / LINE) · `name = null` = ไม่ทราบ */

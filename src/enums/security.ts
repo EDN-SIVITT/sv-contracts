@@ -94,6 +94,8 @@ export const AuthRateLimitScope = {
   LIFF_ID_TOKEN_FAILURE: 'LIFF_ID_TOKEN_FAILURE',
   /** อัปโหลดรูปโปรไฟล์ของผู้บริจาคจากหน้า LINE OA (`SV-CR-011` · SV-ADR-101) — identifier = LINE userId (+ IP) · กันใช้ sharp/storage รัว */
   DONOR_AVATAR_UPLOAD: 'DONOR_AVATAR_UPLOAD',
+  /** ผู้บริจาคแจ้งการบริจาคเองจากหน้า LINE OA (`SV-CR-012` · SV-ADR-103) — identifier = LINE userId (+ IP) · กันส่งรัว/ใช้ sharp/storage รัว */
+  DONOR_DONATION_REPORT: 'DONOR_DONATION_REPORT',
 } as const;
 export type AuthRateLimitScope =
   (typeof AuthRateLimitScope)[keyof typeof AuthRateLimitScope];
