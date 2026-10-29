@@ -218,6 +218,30 @@ export interface DonorListItemView {
   updatedAt: string;
 }
 
+/**
+ * รูปที่ผู้บริจาคอัปโหลดเองจากหน้า LINE OA (`SV-CR-011` · SV-ADR-101) — **ไม่ใช่**รูป LINE (`linePictureUrl`) และไม่แทนที่รูปใน list/Chat ·
+ * แสดงเฉพาะหน้า "บัญชีของฉัน" (LIFF) + section "รูปที่ผู้บริจาคอัปโหลด" ในหน้า view ของ CMS · `version` ใช้กับ `?v=` / ETag
+ */
+export interface DonorUploadedAvatarView {
+  version: string;
+  uploadedAt: string;
+}
+
+/** รูปที่อัปโหลด: WebP จัตุรัส (ตัดกลางภาพ) ขนาดนี้ · รับ PNG/JPEG/WebP (ตรวจจากเนื้อไฟล์) · ขนาดต้นฉบับต่อด้าน */
+export const DONOR_AVATAR_PX = 512;
+export const DONOR_AVATAR_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
+export const DONOR_AVATAR_SOURCE_MIN_PX = 64;
+export const DONOR_AVATAR_SOURCE_MAX_PX = 8000;
+export const DONOR_AVATAR_VERSION_LENGTH = 8;
+/** หน้าเว็บย่อรูปในเครื่องก่อนส่ง (ด้านยาวสุด · JPEG) — ส่งเร็วบนเน็ตมือถือ + รูป HEIC ที่เบราว์เซอร์ถอดได้กลายเป็น JPEG */
+export const DONOR_AVATAR_CLIENT_MAX_PX = 1600;
+/** proxy ของเว็บ CMS (cookie) — `/donor-avatar/<id>?v=<version>` */
+export const DONOR_AVATAR_PATH = '/donor-avatar/';
+
+export function donorAvatarUrl(donorId: string, version: string): string {
+  return `${DONOR_AVATAR_PATH}${encodeURIComponent(donorId)}?v=${encodeURIComponent(version)}`;
+}
+
 /** หน้า view (`GET /donors/:id`) */
 export interface DonorView extends DonorListItemView {
   /** เลขประจำตัวผู้เสียภาษี ตัวเลขล้วน 13 หลัก (แสดงด้วย `formatThaiTaxId()`) · ไม่มี = `null` — ไม่อยู่ในแถวของ list (ไม่แสดงในตาราง · ค้นด้วย `q` ได้) */
@@ -226,6 +250,8 @@ export interface DonorView extends DonorListItemView {
   lineLinkedAt: string | null;
   /** เวลายอมรับ consent ครั้งล่าสุด (`donor_consents` · ยอมรับตอนผูก/สมัครผ่านหน้า LINE OA — `T-074`) · ยังไม่เคย = `null` */
   latestConsentAt: string | null;
+  /** รูปที่ผู้บริจาคอัปโหลดเอง (`SV-CR-011`) · ไม่มี = `null` — section แยกในหน้า view (ไม่แทน `DonorAvatar`) */
+  uploadedAvatar: DonorUploadedAvatarView | null;
 }
 
 /** body ของ `PATCH /donors/:id/line-unlink` — รหัส 6 หลักที่หน้าเว็บสุ่มแสดง + ที่ผู้ใช้พิมพ์ (แบบ `ConfirmCodeDialog` · HST) */

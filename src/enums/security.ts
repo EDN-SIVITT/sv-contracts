@@ -92,6 +92,8 @@ export const AuthRateLimitScope = {
    * กันการยิง token มั่วให้ API ไปเรียก LINE `/oauth2/v2.1/verify` ไม่จำกัด (LINE throttle เรา = ผู้ใช้จริงได้ 503 ทั้งหมด)
    */
   LIFF_ID_TOKEN_FAILURE: 'LIFF_ID_TOKEN_FAILURE',
+  /** อัปโหลดรูปโปรไฟล์ของผู้บริจาคจากหน้า LINE OA (`SV-CR-011` · SV-ADR-101) — identifier = LINE userId (+ IP) · กันใช้ sharp/storage รัว */
+  DONOR_AVATAR_UPLOAD: 'DONOR_AVATAR_UPLOAD',
 } as const;
 export type AuthRateLimitScope =
   (typeof AuthRateLimitScope)[keyof typeof AuthRateLimitScope];

@@ -3,7 +3,7 @@ import { PermissionSubject } from '../permissions';
 import type { ApiListResponse } from './response';
 
 /**
- * "ประวัติการแก้ไข" ของรายการ (`T-107` · SV-ADR-071) — เมนูรายการบริจาค · ออเดอร์ · ของที่ระลึก · โปรแกรม · กองทุน · แคมเปญ (`T-125`)
+ * "ประวัติการแก้ไข" ของรายการ (`T-107` · SV-ADR-071) — เมนูรายการบริจาค · ออเดอร์ · ของที่ระลึก · โปรแกรม · กองทุน · แคมเปญ (`T-125`) · ผู้บริจาค (`T-148`)
  * อ่านจาก `audit_logs` (ไม่มีตารางใหม่ · อยู่นานเท่าระยะเก็บ log) → API แปลงเป็น entry ที่อ่านง่าย: ใคร · ทำอะไร · เมื่อไร · ช่องไหนเปลี่ยน
  * `GET /<เมนู>/history` = ทุกรายการของเมนู (รวมที่ลบ) · `GET /<เมนู>/:id/history` = รายการเดียว (id ที่ลบแล้วยังเปิดได้) · สิทธิ์ = READ_ONLY ของเมนูนั้น
  * ⚠️ ไม่มีค่าภายใน (storage key · ip · user agent · trace) — ช่องที่ส่งมาเฉพาะ whitelist ต่อเมนู (`RECORD_HISTORY_FIELDS`)
@@ -18,6 +18,8 @@ export const RECORD_HISTORY_MENUS = [
   PermissionSubject.PROGRAMS,
   PermissionSubject.FUNDS,
   PermissionSubject.CAMPAIGNS,
+  // ผู้บริจาค (`SV-CR-011` · `T-148` · SV-ADR-102) — รวมการกระทำของผู้บริจาคเองผ่าน LINE OA (ผู้กระทำ "<ชื่อ LINE> (LINE · DNR…)")
+  PermissionSubject.DONORS,
 ] as const;
 export type RecordHistoryMenu = (typeof RECORD_HISTORY_MENUS)[number];
 
@@ -52,6 +54,9 @@ export const RecordHistoryEvent = {
   LOT_ADJUSTED: 'LOT_ADJUSTED',
   LOT_UPDATED: 'LOT_UPDATED',
   LOT_REMOVED: 'LOT_REMOVED',
+  /** ผู้บริจาคผูก LINE ผ่าน LINE OA (`summary.ref` = ชื่อ LINE) · เจ้าหน้าที่ยกเลิกการผูก (`T-148`) */
+  LINE_LINKED: 'LINE_LINKED',
+  LINE_UNLINKED: 'LINE_UNLINKED',
 } as const;
 export type RecordHistoryEvent = (typeof RecordHistoryEvent)[keyof typeof RecordHistoryEvent];
 
@@ -80,6 +85,8 @@ export const RECORD_HISTORY_FIELDS = {
   [PermissionSubject.PROGRAMS]: ['code', 'name', 'description', 'status'],
   [PermissionSubject.FUNDS]: ['code', 'name', 'program', 'description', 'status'],
   [PermissionSubject.CAMPAIGNS]: ['code', 'name', 'fund', 'description', 'year', 'startDate', 'endDate', 'targetAmount', 'status'],
+  /** `address` = ข้อความประกอบภาษาไทยตาม `format` (แบบที่ใช้ส่งของ) · ไม่มี LINE userId / URL รูป / ยอดบริจาค (`T-148`) */
+  [PermissionSubject.DONORS]: ['fullName', 'phone', 'email', 'lineId', 'taxId', 'address', 'status'],
 } as const satisfies Record<RecordHistoryMenu, readonly string[]>;
 export type RecordHistoryField = (typeof RECORD_HISTORY_FIELDS)[RecordHistoryMenu][number];
 
@@ -103,7 +110,7 @@ export interface RecordHistoryRef {
 }
 
 export interface RecordHistorySummary {
-  /** เลขล็อต (`LOT_*`) · เลขออเดอร์ (`ORDER_*`) */
+  /** เลขล็อต (`LOT_*`) · เลขออเดอร์ (`ORDER_*`) · ชื่อ LINE (`LINE_*`) */
   ref?: string | null;
   /** จำนวนออเดอร์ที่พิมพ์ใบแปะหน้าพร้อมกัน (`LABEL_PRINTED`) */
   count?: number;
@@ -115,7 +122,7 @@ export interface RecordHistoryEntry {
   /** id ของ audit log */
   id: string;
   action: AuditAction;
-  /** ชนิดของข้อมูลที่ถูกเขียน (`donation` `donation_status` `donation_slip` · `order` `order_status` `order_slip` `order_label` · `souvenir` `souvenir_image` `souvenir_lot` · `program` `fund` `campaign`) */
+  /** ชนิดของข้อมูลที่ถูกเขียน (`donation` `donation_status` `donation_slip` · `order` `order_status` `order_slip` `order_label` · `souvenir` `souvenir_image` `souvenir_lot` · `program` `fund` `campaign` · `donor` `donor_avatar`) */
   entity: string;
   event: RecordHistoryEvent;
   /** `id = null` = ไม่ใช่ผู้ใช้ CMS (ระบบ / LINE) · `name = null` = ไม่ทราบ */
@@ -129,7 +136,7 @@ export interface RecordHistoryEntry {
 
 /** query ของ `GET /<เมนู>/history` และ `GET /<เมนู>/:id/history` (`q` ใช้เฉพาะแบบรวม) */
 export interface RecordHistoryQuery {
-  /** ค้นเลขที่ (รายการบริจาค/ออเดอร์) · รหัส/ชื่อ (ของที่ระลึก · โปรแกรม · กองทุน · แคมเปญ) — รวมรายการที่ลบแล้ว */
+  /** ค้นเลขที่ (รายการบริจาค/ออเดอร์) · รหัส/ชื่อ (ของที่ระลึก · โปรแกรม · กองทุน · แคมเปญ · ผู้บริจาค) — รวมรายการที่ลบแล้ว */
   q?: string;
   action?: RecordHistoryAction;
   /** ช่วงวันที่ทำ (`YYYY-MM-DD` เวลาไทย · รวมปลาย) */

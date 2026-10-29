@@ -78,6 +78,13 @@ export const ErrorCode = {
   DONOR_LINK_REJECTED: 'DONOR_LINK_REJECTED',
   /** ข้อความ consent ถูกแก้ระหว่างที่ผู้ใช้อ่าน (`consentSha256` ไม่ตรงฉบับปัจจุบัน · 409) → โหลดข้อความใหม่แล้วยอมรับอีกครั้ง */
   DONOR_CONSENT_OUTDATED: 'DONOR_CONSENT_OUTDATED',
+  /**
+   * ผู้บริจาคแก้ข้อมูลส่วนตัวจากหน้า LINE OA ด้วยข้อมูลที่ไม่ใช่ฉบับล่าสุด (`profileVersion` ไม่ตรง · 409 · `SV-CR-011` · SV-ADR-100) —
+   * เจ้าหน้าที่แก้ข้อมูลคั่นกลาง → ไม่บันทึกทับ · หน้าเว็บโหลดค่าล่าสุดแล้วให้ตรวจอีกครั้ง
+   */
+  DONOR_PROFILE_STALE: 'DONOR_PROFILE_STALE',
+  /** แก้ข้อมูลส่วนตัว/รูปจากหน้า LINE OA ทั้งที่ยังไม่ได้กรอกฟอร์มสมัคร (409 · `SV-CR-011`) — หน้าเว็บพาไปหน้าสมัคร */
+  DONOR_REGISTRATION_REQUIRED: 'DONOR_REGISTRATION_REQUIRED',
   // ── ของที่ระลึก · สต็อกแบบ lot · ออเดอร์ (`SV-CR-004` · FT-15/FT-16 · SV-ADR-050 · `T-077`) ──
   /** รหัสสินค้าซ้ำ (unique รวมแถวที่ลบแล้ว) — 422 `details { field: 'code' }` */
   SOUVENIR_CODE_TAKEN: 'SOUVENIR_CODE_TAKEN',

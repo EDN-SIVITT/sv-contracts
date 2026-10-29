@@ -1,5 +1,5 @@
 import type { LineChannel } from '../enums/line';
-import type { DonorAddressView, DonorRegistrationChannel, DonorStatus } from './donors';
+import type { DonorAddressView, DonorRegistrationChannel, DonorStatus, DonorUploadedAvatarView } from './donors';
 
 /**
  * หน้า LINE OA ของผู้บริจาค (LIFF) — `SV-CR-003` ข้อ 2 · FT-14 `REQ-DNL-*` · SV-ADR-044/045/046 · `T-074`
@@ -153,6 +153,7 @@ export interface DonorLinkView {
  * กฎความยาว/รูปแบบเดียวกับฟอร์มของ CMS (`DONOR_*_MAX_LENGTH` ใน `./donors`) · error 422 ลงช่อง (`details.field` = `fullName` · `address.<ช่อง>`)
  * บังคับเฉพาะชื่อ (`SV-CR-003` ข้อ 2.4 ติด * ช่องเดียว · `T-074` ตัดสิน) · ที่อยู่ไม่ส่ง/`null`/ว่างทุกช่อง = ไม่มีที่อยู่ ·
  * กรอกบางช่อง = ต้องครบ `addressLine` + `subdistrictId` (แบบฟอร์มของ CMS) · `lineId`/`email` = `''` → ไม่มีค่า ·
+ * `lineId` **ไม่ส่ง key = ไม่แตะค่าเดิม** (ฟอร์มรุ่น `SV-CR-011` ไม่มีช่อง LINE ID · SV-ADR-100) ·
  * `taxId` ไม่บังคับ (`T-120` · กฎ `normalizeThaiTaxId`): `''`/`null` = ไม่มี · **ไม่ส่ง key = ไม่แตะค่าเดิม** (หน้าเว็บรุ่นเก่า) · ผิด = 422 `taxId`
  */
 export interface DonorRegistrationInput {
@@ -184,7 +185,31 @@ export interface DonorLiffProfileView {
   status: DonorStatus;
   registrationChannel: DonorRegistrationChannel;
   address: DonorAddressView | null;
+  /** รูปที่อัปโหลดเอง (`SV-CR-011` · SV-ADR-101) — `null` = ใช้รูป LINE · อ่านไฟล์ที่ `GET …/donor/avatar?v=<version>` (ต้องมี ID token) */
+  uploadedAvatar: DonorUploadedAvatarView | null;
+  /**
+   * ลายนิ้วมือของข้อมูลที่ผู้บริจาคแก้ได้ (ชื่อ · อีเมล · เลขผู้เสียภาษี · ที่อยู่ทั้ง 2 ชุด — hex 16 ตัว) — ส่งกลับใน `PATCH …/donor/profile`
+   * กันบันทึกทับข้อมูลที่เจ้าหน้าที่เพิ่งแก้ · ⚠️ ไม่ใช้ `updated_at` (TypeORM เขียนแค่ระดับวินาที + ยอดบริจาค/สถานะที่ไม่เกี่ยวก็ขยับค่า · TEC-09)
+   */
+  profileVersion: string;
 }
+
+/**
+ * body ของ `PATCH …/donor/profile` (`SV-CR-011` · SV-ADR-100) — ผู้บริจาค (`ACTIVE`) แก้ข้อมูลส่วนตัวเอง · กฎ/ข้อความ error ชุดเดียวกับฟอร์มสมัคร
+ * ชื่อบังคับ · **key ไม่ส่ง = ไม่แตะค่าเดิม** · `''`/`null` = ล้าง · `address` = แบบฟอร์มเท่านั้น (`null` = ไม่มีที่อยู่) — ส่งเฉพาะเมื่อผู้บริจาคแก้ส่วนที่อยู่
+ * (ข้อความที่อยู่เดิมของเจ้าหน้าที่ถูกเก็บเป็นชุดอ้างอิง) · เบอร์/LINE ID แก้ที่นี่ไม่ได้ ·
+ * `profileVersion` = ค่าจาก `me` ที่ฟอร์มโหลดมา → ข้อมูลปัจจุบันไม่ตรง = 409 `DONOR_PROFILE_STALE` (ไม่บันทึก) · ไม่มีอะไรเปลี่ยน = 200 ไม่เขียน/ไม่มี audit
+ */
+export interface DonorProfileUpdateInput {
+  fullName: string;
+  email?: string | null;
+  taxId?: string | null;
+  address?: DonorRegistrationInput['address'];
+  profileVersion: string;
+}
+
+/** รูปแบบของ `profileVersion` (hex 16 ตัว) */
+export const DONOR_PROFILE_VERSION_PATTERN = /^[0-9a-f]{16}$/;
 
 /** `GET …/donor/me` — `donor` มีเมื่อผูกแล้ว (ทุก state ยกเว้น `NOT_LINKED`) · `line` จาก ID token เสมอ */
 export interface DonorLiffMeView {
