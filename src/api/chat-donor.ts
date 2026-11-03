@@ -28,24 +28,107 @@ export interface ChatThreadDonorLinkInput {
   donorId: string;
 }
 
-/** โน้ตส่งต่องานของห้องสนทนา — ความยาวหลัง trim 1…ค่านี้ (UTF-16 code units · ตรงกับ `VARCHAR(1000)` ของ `chat_notes.body`) */
+/** โน้ตส่งต่องานของห้องสนทนา — ความยาวหลัง trim 0…ค่านี้ (UTF-16 code units · ตรงกับ `VARCHAR(1000)` ของ `chat_notes.body`) · ว่างได้เมื่อมีไฟล์แนบ (`T-162`) */
 export const CHAT_NOTE_MAX_LENGTH = 1000;
 /** `GET /chat/threads/:id/notes` คืนโน้ตล่าสุดไม่เกินจำนวนนี้ (ใหม่ → เก่า) */
 export const CHAT_NOTE_LIST_LIMIT = 200;
+/**
+ * ไฟล์แนบต่อโน้ตไม่เกินจำนวนนี้ — นับรวมไฟล์เดิมที่ยังไม่เอาออก (`SV-CR-014` §3 · SV-ADR-112 · `T-162`) ·
+ * เกิน = 422 `VALIDATION_FAILED` `details { field: 'files', reason: 'TOO_MANY', max }` (รวมกรณี multipart ส่งมาเกินที่ชั้น multer)
+ */
+export const CHAT_NOTE_MAX_FILES = 10;
 
-/** body ของ `POST /chat/threads/:id/notes` · `PATCH /chat/notes/:id` */
+/** ชนิดไฟล์แนบของโน้ต — `IMAGE` = รูป (มีภาพย่อ WebP `thumb`/`preview`) · `FILE` = เอกสาร (ต้นฉบับอย่างเดียว) */
+export const ChatNoteFileKind = {
+  IMAGE: 'IMAGE',
+  FILE: 'FILE',
+} as const;
+export type ChatNoteFileKind = (typeof ChatNoteFileKind)[keyof typeof ChatNoteFileKind];
+
+/** `GET /chat/notes/files/:fileId?variant=` — `thumb`/`preview` = WebP เฉพาะรูป (เอกสาร = 404) · `original` (ค่าเริ่มต้น) = ไฟล์ต้นฉบับ */
+export const ChatNoteFileVariant = {
+  THUMB: 'thumb',
+  PREVIEW: 'preview',
+  ORIGINAL: 'original',
+} as const;
+export type ChatNoteFileVariant = (typeof ChatNoteFileVariant)[keyof typeof ChatNoteFileVariant];
+export const CHAT_NOTE_FILE_VARIANTS: readonly ChatNoteFileVariant[] = Object.values(ChatNoteFileVariant);
+
+/** ด้านยาวสุด (px) ของภาพย่อ WebP ที่ระบบสร้างจากรูป (ไม่ขยาย · หมุนตาม EXIF · GIF ใช้เฟรมแรก) */
+export const CHAT_NOTE_IMAGE_MAX_PX = { thumb: 320, preview: 1600 } as const;
+
+/**
+ * ชนิดไฟล์ที่โน้ตรับ: นามสกุล (ตัวเล็ก ไม่มีจุด) → MIME ที่ระบบเก็บ/ส่งกลับ — เว็บใช้ตรวจ**นามสกุล**ก่อนส่ง (MIME จากเบราว์เซอร์ไม่แน่นอน เช่น csv บน Windows) ·
+ * API ตรวจ**เนื้อไฟล์**ซ้ำเสมอ: รูป = sharp อ่านได้และเป็น JPEG/PNG/WebP/GIF (นามสกุลรูปตัวไหนก็ได้ · ไม่มีนามสกุลได้ เช่นรูปที่วางจากคลิปบอร์ด) ·
+ * `pdf` = หัว `%PDF-` · `docx`/`xlsx`/`pptx` = ZIP (`PK\x03\x04`) · `doc`/`xls`/`ppt` = OLE (`D0 CF 11 E0 A1 B1 1A E1`) · `txt`/`csv` = ไม่มีไบต์ NUL ใน 8 KB แรก ·
+ * ไม่ผ่าน = 422 `FILE_TYPE_NOT_ALLOWED` `details { field: 'files', index, name, reason: 'EXTENSION' | 'CONTENT' | 'CORRUPT' | 'EMPTY', accepted }`
+ */
+export const CHAT_NOTE_FILE_TYPES = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  gif: 'image/gif',
+  pdf: 'application/pdf',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls: 'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ppt: 'application/vnd.ms-powerpoint',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  txt: 'text/plain',
+  csv: 'text/csv',
+} as const;
+export type ChatNoteFileExtension = keyof typeof CHAT_NOTE_FILE_TYPES;
+/** MIME ของรูปที่รับ (ได้ `kind: IMAGE` + ภาพย่อ) */
+export const CHAT_NOTE_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
+/** ค่า `accept` ของ `<input type="file">` — `.jpg,.jpeg,…,.csv` */
+export const CHAT_NOTE_FILE_ACCEPT = Object.keys(CHAT_NOTE_FILE_TYPES)
+  .map((ext) => `.${ext}`)
+  .join(',');
+
+/**
+ * ฟอร์มของ `POST /chat/threads/:id/notes` — **multipart** (`body` · `showOnHome` `'true'`/`'false'` · `files` ซ้ำได้หลายไฟล์ ชื่อช่องตรงตัว) หรือ JSON (ไม่มีไฟล์ · แบบเดิม `{ body }` ใช้ได้)
+ * `body` trim แล้ว 0–`CHAT_NOTE_MAX_LENGTH` · body ว่าง + ไม่มีไฟล์ = 422 `VALIDATION_FAILED` `details { field: 'body', reason: 'REQUIRED' }` · `showOnHome` ไม่ส่ง = `true`
+ */
 export interface ChatNoteInput {
-  body: string;
+  body?: string;
+  showOnHome?: boolean;
+}
+
+/**
+ * ฟอร์มของ `PATCH /chat/notes/:id` — ช่องที่ไม่ส่ง = คงเดิม · `files` = ไฟล์ใหม่ต่อท้าย · `removeFileIds` = id ไฟล์เดิมที่เอาออก
+ * (multipart ส่งช่องซ้ำหรือคั่นจุลภาค · JSON เป็น array · id ที่ไม่ใช่ไฟล์ของโน้ตนี้แล้ว = ข้าม) · ผลรวมไฟล์ > `CHAT_NOTE_MAX_FILES` / body ว่าง + ไฟล์เหลือ 0 = 422 · ทำทั้งชุดแบบ atomic
+ */
+export interface ChatNoteUpdateInput extends ChatNoteInput {
+  removeFileIds?: string[];
+}
+
+/** ไฟล์แนบของโน้ต (`chat_note_files`) — ไม่มี storage key · ดาวน์โหลด/ภาพย่อผ่าน `GET /chat/notes/files/:id?variant=` (`chat` READ_ONLY) */
+export interface ChatNoteFileView {
+  id: string;
+  /** ชื่อไฟล์เดิม (ตัด path/อักขระควบคุม ≤ 255 ตัวอักษร) — ใช้เป็นชื่อตอนดาวน์โหลด */
+  name: string;
+  /** ชนิดของไฟล์ต้นฉบับที่ระบบตรวจจากเนื้อไฟล์ (ค่าใน `CHAT_NOTE_FILE_TYPES`) */
+  mimeType: string;
+  /** ขนาดไฟล์ต้นฉบับ (ไบต์) */
+  size: number;
+  kind: ChatNoteFileKind;
+  /** ขนาดภาพหลังหมุนตาม EXIF (px) · เอกสาร = `null` */
+  width: number | null;
+  height: number | null;
 }
 
 /**
  * โน้ตของห้องสนทนา (`chat_notes` · SV-ADR-109) — ผู้สร้าง/ผู้แก้ล่าสุดแบบ `ChatMessageSender` (ผู้ใช้ที่ถูกลบแบบ soft ยังแสดงชื่อ ·
- * ลบถาวร/ไม่ทราบ = `null`) · `updatedAt` = `createdAt` เมื่อยังไม่เคยแก้
+ * ลบถาวร/ไม่ทราบ = `null`) · `updatedAt` = `createdAt` เมื่อยังไม่เคยแก้ · `showOnHome` = แสดงในหน้าแรกของแผง · `files` เรียงตามลำดับแนบ (`T-162`)
  */
 export interface ChatNoteView {
   id: string;
   threadId: string;
   body: string;
+  showOnHome: boolean;
+  files: ChatNoteFileView[];
   createdBy: ChatMessageSender | null;
   updatedBy: ChatMessageSender | null;
   createdAt: string;
