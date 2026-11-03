@@ -38,12 +38,14 @@ export const ErrorCode = {
   IMAGE_DIMENSIONS_INVALID: 'IMAGE_DIMENSIONS_INVALID',
   /** แถวค่าตั้งค่าที่ฟีเจอร์ต้องใช้ยังไม่มีใน DB (ยังไม่ได้รัน migration) — `details.key` (SV-ADR-036) */
   SETTING_NOT_INSTALLED: 'SETTING_NOT_INSTALLED',
-  /** เบอร์โทรนี้มีผู้บริจาคอื่น (ที่ยังไม่ถูกลบ) ใช้อยู่ — 422 · `details: { field: 'phone', donorCode }` ให้ฟอร์มบอกรหัสของคนที่ใช้อยู่ (`REQ-DNR-*` · SV-ADR-043) */
+  /** เบอร์โทรนี้มีผู้บริจาคอื่น (ที่ยังไม่ถูกลบ) ใช้อยู่ — 422 · `details: { field: 'phone', donorCode, donorId }` ให้ฟอร์มบอกรหัส/ลิงก์ของคนที่ใช้อยู่ (`REQ-DNR-*` · SV-ADR-043 · `donorId` `T-158`) — ไม่ทราบผู้ถือ = ทั้งคู่ `null` */
   DONOR_PHONE_TAKEN: 'DONOR_PHONE_TAKEN',
   /** ยกเลิกการผูก LINE ของผู้บริจาคที่ไม่ได้ผูกอยู่ (ถูกยกเลิกไปแล้ว/ไม่เคยผูก) — 409 */
   DONOR_LINE_NOT_LINKED: 'DONOR_LINE_NOT_LINKED',
   /** ออกรหัสผู้บริจาคไม่สำเร็จ — รหัสที่ประกอบได้ชนกับรหัสเดิมติดกันหลายครั้ง (ตรวจคำนำหน้า/จำนวนหลักในเมนูตั้งค่า) — 409 */
   DONOR_CODE_CONFLICT: 'DONOR_CODE_CONFLICT',
+  /** ผูก LINE ของห้องสนทนากับผู้บริจาคที่ผูก LINE บัญชีอื่นอยู่แล้ว (409 · Chat `T-158` · SV-ADR-108) — ต้องยกเลิกผูกที่หน้าผู้บริจาคก่อน · `details { donorId, donorCode }` */
+  DONOR_LINE_ALREADY_LINKED: 'DONOR_LINE_ALREADY_LINKED',
   // ── หน้า LINE OA ของผู้บริจาค (LIFF · `SV-CR-003` ข้อ 2 · FT-14 · SV-ADR-044/045/046 · `T-074`) ──
   /** ไม่มี / ตรวจไม่ผ่าน / หมดอายุ — LINE ID token ใน header `X-Line-Id-Token` (401) · หน้าเว็บขอ token ใหม่แล้วลองอีกครั้ง */
   LINE_ID_TOKEN_INVALID: 'LINE_ID_TOKEN_INVALID',
@@ -63,7 +65,7 @@ export const ErrorCode = {
   DONOR_OTP_COOLDOWN: 'DONOR_OTP_COOLDOWN',
   /** `verificationToken` ไม่ถูกต้อง · หมดอายุ · ใช้แล้ว · ไม่ใช่ของ LINE user นี้ (422) → เริ่มยืนยันเบอร์ใหม่ */
   DONOR_VERIFICATION_INVALID: 'DONOR_VERIFICATION_INVALID',
-  /** LINE บัญชีนี้ผูกกับผู้บริจาคอยู่แล้ว (409) — ผูกซ้ำ/ขอ OTP ไม่ได้ */
+  /** LINE บัญชีนี้ผูกกับผู้บริจาคอยู่แล้ว (409) — ผูกซ้ำ/ขอ OTP ไม่ได้ · ผูก/สร้างจาก Chat (`T-158`) มี `details { donorId, donorCode }` ของผู้ที่ผูกอยู่ */
   DONOR_ALREADY_LINKED: 'DONOR_ALREADY_LINKED',
   /** ผู้บริจาคที่ผูกกับ LINE บัญชีนี้ถูกระงับ (403) — ใช้หน้า LINE OA ไม่ได้ ติดต่อเจ้าหน้าที่ */
   DONOR_SUSPENDED: 'DONOR_SUSPENDED',

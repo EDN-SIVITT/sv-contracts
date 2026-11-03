@@ -369,6 +369,11 @@ export interface OrderListItemView {
    * สถานะอื่น = `false` · คำนวณต่อหน้าจาก SQL กลาง (ตรงกับ `?stock=SHORT` และ Dashboard) · list เท่านั้น
    */
   awaitingStock: boolean;
+  /**
+   * ของในใบแบบย่อ — ชื่อ ณ ตอนสั่ง (`order_items.souvenir_name`) × จำนวน + หน่วย เรียงตามลำดับในใบ (`SV-CR-013` · `T-161`) ·
+   * query เดียวต่อหน้า · list เท่านั้น (หน้า view ใช้ `items` ตัวเต็ม) — การ์ดออเดอร์ในแผงผู้บริจาคของหน้า Chat
+   */
+  itemLines: OrderLabelItem[];
 }
 
 /** รายการบริจาคต้นทางของออเดอร์ — list/view แสดง "อ้างอิง DON…" (ลิงก์ `/donations/[id]`) + สถานะรายการบริจาคปัจจุบัน */
@@ -401,7 +406,7 @@ export interface OrderSplitSiblingView {
 export type OrderRecipientStructuredAddressView = Omit<DonorAddressView, 'format' | 'text'>;
 
 /** หน้า view (`GET /orders/:id`) — ปุ่มที่ทำได้ = `ORDER_STATUS_TRANSITIONS[status]` · ส่วนที่แก้ได้ = `ORDER_EDITABLE_SECTIONS[status]` (ไม่ส่งซ้ำ) */
-export interface OrderView extends Omit<OrderListItemView, 'awaitingStock'> {
+export interface OrderView extends Omit<OrderListItemView, 'awaitingStock' | 'itemLines'> {
   /** สถานะผู้บริจาค ณ ปัจจุบัน (badge เตือนเมื่อ `SUSPENDED`) · `null` = ถูกลบ */
   donorStatus: DonorStatus | null;
   /** ข้อความล้วน — เก็บทุกรูปแบบ (`STRUCTURED` = ข้อความที่ API แปลงจากแบบฟอร์ม) · ใบแปะหน้า/list/ค้นหาใช้ตัวนี้ */
