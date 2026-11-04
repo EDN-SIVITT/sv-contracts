@@ -46,6 +46,10 @@ export const ErrorCode = {
   DONOR_CODE_CONFLICT: 'DONOR_CODE_CONFLICT',
   /** ผูก LINE ของห้องสนทนากับผู้บริจาคที่ผูก LINE บัญชีอื่นอยู่แล้ว (409 · Chat `T-158` · SV-ADR-108) — ต้องยกเลิกผูกที่หน้าผู้บริจาคก่อน · `details { donorId, donorCode }` */
   DONOR_LINE_ALREADY_LINKED: 'DONOR_LINE_ALREADY_LINKED',
+  /** มอบหมายห้องแชทให้ผู้ใช้ที่ไม่มีสิทธิ์ Chat ระดับแก้ไข / ถูกลบ / ไม่มีอยู่ (422 · `SV-CR-015` · SV-ADR-117) — `details { userId }` · หน้าเว็บโหลดรายชื่อใหม่ */
+  CHAT_ASSIGNEE_NOT_ELIGIBLE: 'CHAT_ASSIGNEE_NOT_ELIGIBLE',
+  /** แฟล็กที่เลือกไม่มีใน ตั้งค่า → Chat แล้ว (ถูกลบระหว่างเปิดหน้า · 422 · SV-ADR-116) — `details { flagId }` · หน้าเว็บโหลดค่าใหม่ */
+  CHAT_FLAG_UNKNOWN: 'CHAT_FLAG_UNKNOWN',
   // ── หน้า LINE OA ของผู้บริจาค (LIFF · `SV-CR-003` ข้อ 2 · FT-14 · SV-ADR-044/045/046 · `T-074`) ──
   /** ไม่มี / ตรวจไม่ผ่าน / หมดอายุ — LINE ID token ใน header `X-Line-Id-Token` (401) · หน้าเว็บขอ token ใหม่แล้วลองอีกครั้ง */
   LINE_ID_TOKEN_INVALID: 'LINE_ID_TOKEN_INVALID',

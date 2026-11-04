@@ -214,6 +214,11 @@ export interface DonorListItemView {
   donationCount: number;
   /** DECIMAL(15,2) เป็นข้อความ (`"0.00"`) — กันทศนิยมเพี้ยน · เว็บแสดง `1,234.00` */
   donationTotal: string;
+  /**
+   * ห้องแชทของ LINE ที่ผูกอยู่ (`SV-CR-015` §8 · SV-ADR-119) — ปุ่ม "เปิดแชท" ในเมนูผู้บริจาค · ผูกแล้วแต่ยังไม่เคยแชท / ยังไม่ผูก = `null`
+   * (ผูกแล้วแต่ยังไม่มีห้อง → `POST /chat/threads/for-donor/:donorId` สร้างห้องเปล่าให้)
+   */
+  chatThreadId: string | null;
   createdAt: string;
   updatedAt: string;
 }

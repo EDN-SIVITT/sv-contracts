@@ -11,6 +11,7 @@ export * from './api/settings';
 export * from './api/branding';
 export * from './api/message-templates';
 export * from './api/chat';
+export * from './api/chat-settings';
 export * from './api/chat-donor';
 export * from './api/addresses';
 export * from './api/donors';

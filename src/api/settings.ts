@@ -23,6 +23,8 @@ export const SettingGroup = {
   DONATION: 'donation',
   /** โครงสร้างการรับบริจาค (e-Donation · `SV-CR-007` · SV-ADR-090 · `T-131`) — เปิด/ปิดชั้นโปรแกรม (3 ชั้น ↔ 4 ชั้น) */
   FUNDRAISING: 'fundraising',
+  /** Chat (`SV-CR-015` · SV-ADR-115/116) — สถานะการตอบสนอง (เปิด/ปิด · เกณฑ์นาที) · แฟล็ก · "อ่านแล้ว" ใน LINE — ค่า/parser กลาง `./chat-settings.ts` */
+  CHAT: 'chat',
 } as const;
 export type SettingGroup = (typeof SettingGroup)[keyof typeof SettingGroup];
 
@@ -160,6 +162,14 @@ export const SettingKey = {
    * ค่าที่ `0030` ใส่ = `true` เมื่อมีโปรแกรมอยู่แล้ว (site เดิม) ไม่งั้น `false` (site ใหม่) · ปิดแล้วโปรแกรม/ความสัมพันธ์/สิทธิ์เดิมยังอยู่ครบ · ทุกคนรู้ค่าผ่าน `GET /auth/me` `features`
    */
   FUNDRAISING_PROGRAM_ENABLED: 'fundraising.programEnabled',
+  /** แสดงสถานะการตอบสนอง (จุด 3 สี · ตัวกรอง · ปุ่มรับทราบ) — `SV-CR-015` · SV-ADR-115 · ปิดแล้ว API ยังบันทึกเวลาต่อ · ค่าเริ่มต้น `CHAT_RESPONSE_STATUS_DEFAULT_ENABLED` */
+  CHAT_RESPONSE_STATUS_ENABLED: 'chat.responseStatusEnabled',
+  /** รอเกินกี่นาที = แดง (1–1440) · ค่าเริ่มต้น `CHAT_RESPONSE_OVERDUE_DEFAULT_MINUTES` (5) */
+  CHAT_RESPONSE_OVERDUE_MINUTES: 'chat.responseOverdueMinutes',
+  /** นิยามแฟล็ก (JSON `ChatFlag[]` ≤ 10) — ตรวจด้วย `validateChatFlags` ตอนบันทึก · SV-ADR-116 */
+  CHAT_FLAGS: 'chat.flags',
+  /** ตอบ/รับทราบแล้วส่ง "อ่านแล้ว" ให้ผู้บริจาคใน LINE (`markAsRead`) — ค่าเริ่มต้น `CHAT_LINE_READ_RECEIPT_DEFAULT_ENABLED` */
+  CHAT_LINE_READ_RECEIPT_ENABLED: 'chat.lineReadReceiptEnabled',
 } as const;
 export type SettingKey = (typeof SettingKey)[keyof typeof SettingKey];
 
@@ -233,6 +243,8 @@ export const SETTING_NUMBER_BOUNDS: Readonly<Record<string, { min: number; max: 
   [SettingKey.ORDER_LABEL_WIDTH_MM]: { min: 20, max: 200 },
   [SettingKey.ORDER_LABEL_HEIGHT_MM]: { min: 20, max: 200 },
   [SettingKey.ORDER_LABEL_MARGIN_MM]: { min: 0, max: 10 },
+  // SV-ADR-115 — 1 นาทีถึง 1 วัน (เกินวันแสดงเป็นวันอยู่แล้ว)
+  [SettingKey.CHAT_RESPONSE_OVERDUE_MINUTES]: { min: 1, max: 1440 },
 };
 
 /**

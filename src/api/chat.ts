@@ -1,5 +1,6 @@
 import { ChatMessageType, type ChatMessageDirection } from '../enums/chat';
 import type { LineChannel } from '../enums/line';
+import type { ChatFlag } from './chat-settings';
 
 /** รายการคู่สนทนาที่ CMS เห็น — ข้อมูลตัวตนมาจาก LINE account เท่านั้น (`REQ-CHT-001`) */
 export interface ChatThreadListItemView {
@@ -22,6 +23,120 @@ export interface ChatThreadListItemView {
    * event ของ realtime อาจมาถึงไม่ตรงลำดับ (คนละ replica) → client ใช้ค่านี้ไม่ให้สถานะเก่าทับสถานะใหม่
    */
   updatedAt: string | null;
+  /**
+   * `SV-CR-015` · SV-ADR-115 — เวลาข้อความขาเข้า**แรก**ที่ยังไม่ได้ตอบ (ตัวจับเวลาสถานะการตอบสนอง) · ตอบ/รับทราบแล้ว = `null`
+   * สีคำนวณที่เว็บด้วย {@link chatResponseStatus} (เวลาเดินต่อเองโดยไม่ต้องมี event)
+   */
+  awaitingSince: string | null;
+  /** การตอบสนองล่าสุด (ตอบข้อความจาก CMS / กดรับทราบ) · ยังไม่เคย = `null` */
+  lastResponse: ChatLastResponse | null;
+  /** แฟล็กของห้อง (id ใน settings `chat.flags` · SV-ADR-116) — id ที่ไม่อยู่ใน settings แล้ว = ถือว่าไม่มีแฟล็ก */
+  flagId: string | null;
+  /** เจ้าหน้าที่ผู้ดูแลห้อง (SV-ADR-117) · ไม่มี / ผู้ใช้ถูกลบ = `null` */
+  assignee: ChatUserRef | null;
+  assignedAt: string | null;
+}
+
+/** ผู้ใช้ระบบแบบย่อ (id · ชื่อ-นามสกุล) — ผู้ดูแลห้อง · ผู้ตอบสนองล่าสุด · รายชื่อที่มอบหมายได้ */
+export interface ChatUserRef {
+  id: string;
+  name: string;
+}
+
+// ── สถานะการตอบสนอง · แฟล็ก · ผู้ดูแล (`SV-CR-015` · SV-ADR-115…117) ─────────────────
+
+/** ชนิดการตอบสนอง — ตรงกับ `chat_threads.last_response_kind` */
+export const ChatResponseKind = {
+  /** ตอบข้อความจาก CMS */
+  REPLY: 'REPLY',
+  /** กด "รับทราบ" (ไม่ต้องตอบ เช่นลูกค้าส่งสติกเกอร์ขอบคุณ) */
+  ACK: 'ACK',
+} as const;
+export type ChatResponseKind = (typeof ChatResponseKind)[keyof typeof ChatResponseKind];
+
+export interface ChatLastResponse {
+  kind: ChatResponseKind;
+  at: string;
+  /** ผู้ตอบสนอง · ผู้ใช้ถูกลบถาวร = `null` */
+  by: ChatUserRef | null;
+}
+
+/**
+ * สถานะการตอบสนอง 3 สี (SV-ADR-115) — `null` = ไม่มีสถานะ (ยังไม่มีข้อความขาเข้า/ยังไม่เคยตอบ) · ตัวกรอง `response=` ของ `GET /chat/threads` ใช้ค่าเดียวกัน
+ */
+export const ChatResponseStatus = {
+  /** เขียว — ตอบแล้ว (ข้อความสุดท้ายจากฝั่งเรา) หรือกดรับทราบแล้ว */
+  RESPONDED: 'RESPONDED',
+  /** เหลือง — ลูกค้าส่งล่าสุด ยังไม่ตอบ ภายในเกณฑ์ (`chat.responseOverdueMinutes`) */
+  WAITING: 'WAITING',
+  /** แดง — รอเกินเกณฑ์ (แสดงเวลารอ) */
+  OVERDUE: 'OVERDUE',
+} as const;
+export type ChatResponseStatus = (typeof ChatResponseStatus)[keyof typeof ChatResponseStatus];
+export const CHAT_RESPONSE_STATUSES = [ChatResponseStatus.RESPONDED, ChatResponseStatus.WAITING, ChatResponseStatus.OVERDUE] as const;
+
+/** สีของห้อง ณ เวลา `now` (ms) — เว็บเรียกซ้ำทุกนาที (`useNow`) · กติกาเดียวกับตัวกรองของ API */
+export function chatResponseStatus(
+  thread: Pick<ChatThreadListItemView, 'awaitingSince' | 'lastResponse'>,
+  overdueMinutes: number,
+  now: number,
+): ChatResponseStatus | null {
+  if (thread.awaitingSince) {
+    const waited = now - Date.parse(thread.awaitingSince);
+    return waited >= overdueMinutes * 60_000 ? ChatResponseStatus.OVERDUE : ChatResponseStatus.WAITING;
+  }
+  return thread.lastResponse ? ChatResponseStatus.RESPONDED : null;
+}
+
+/** เวลารอแยกหน่วย (ปัดลงเป็นนาที · ติดลบ = 0) — ป้ายย่อ: นาที (< 1 ชม.) → ชม. (< 1 วัน) → วัน */
+export function chatWaitParts(ms: number): { days: number; hours: number; minutes: number } {
+  const total = Math.max(0, Math.floor(ms / 60_000));
+  return { days: Math.floor(total / 1440), hours: Math.floor((total % 1440) / 60), minutes: total % 60 };
+}
+
+/** แท็บของช่องรายชื่อ — `scope` ของ `GET /chat/threads` */
+export const ChatThreadScope = {
+  ALL: 'all',
+  /** ห้องที่ผู้ใช้ปัจจุบันเป็นผู้ดูแล */
+  MINE: 'mine',
+} as const;
+export type ChatThreadScope = (typeof ChatThreadScope)[keyof typeof ChatThreadScope];
+export const CHAT_THREAD_SCOPES = [ChatThreadScope.ALL, ChatThreadScope.MINE] as const;
+
+/** ค่าในตัวกรอง `flag=` / `assignee=` ที่หมายถึง "ไม่มีแฟล็ก" / "ยังไม่มีผู้ดูแล" */
+export const CHAT_FILTER_NONE = 'none';
+
+/** แนบมากับผลของ `GET /chat/threads` (ไม่ขึ้นกับตัวกรอง) — ตัวเลขบนแท็บ "ของฉัน" */
+export interface ChatThreadListSummary {
+  mine: {
+    total: number;
+    /** สถานะ เหลือง + แดง */
+    awaiting: number;
+    /** มีข้อความยังไม่อ่าน */
+    unread: number;
+  };
+}
+
+/** `GET /chat/config` (`chat` READ_ONLY) — ค่าจาก ตั้งค่า → Chat ที่หน้า Chat ต้องใช้ (ไม่ต้องมีสิทธิ์ตั้งค่า) */
+export interface ChatConfigView {
+  responseStatus: {
+    /** `chat.responseStatusEnabled` — ปิด = ซ่อนจุดสถานะ/ตัวกรองสถานะ/ปุ่มรับทราบ */
+    enabled: boolean;
+    /** `chat.responseOverdueMinutes` */
+    overdueMinutes: number;
+  };
+  /** `chat.flags` (ผ่าน `readChatFlags` แล้ว) */
+  flags: ChatFlag[];
+}
+
+/** body ของ `PUT /chat/threads/:id/flag` — `null` = เอาแฟล็กออก */
+export interface ChatThreadFlagInput {
+  flagId: string | null;
+}
+
+/** body ของ `PUT /chat/threads/:id/assignee` — `null` = ยกเลิกการมอบหมาย · id ตัวเอง = รับดูแลเอง */
+export interface ChatThreadAssigneeInput {
+  userId: string | null;
 }
 
 /**
@@ -99,7 +214,7 @@ export const CHAT_STREAM_HEARTBEAT_SECONDS = 25;
 export const ChatStreamEventName = {
   /** ส่งครั้งแรกหลังต่อสำเร็จ — client ใช้เป็นสัญญาณให้ดึงส่วนที่พลาดระหว่างหลุด */
   READY: 'ready',
-  /** มีการเปลี่ยนแปลงของคู่สนทนา (ข้อความใหม่ · อ่านแล้ว) */
+  /** มีการเปลี่ยนแปลงของคู่สนทนา (ข้อความใหม่ · อ่านแล้ว · รับทราบ/แฟล็ก/ผู้ดูแล) */
   THREAD: 'thread',
   /** API กำลังปิดสาย — `data.reason` บอกว่าควรต่อใหม่แบบไหน */
   CLOSE: 'close',
@@ -112,6 +227,8 @@ export const ChatEventKind = {
   MESSAGE: 'MESSAGE',
   /** แอดมินเปิดอ่าน (unread → 0) */
   READ: 'READ',
+  /** แอดมินเปลี่ยนสถานะห้อง — รับทราบ · แฟล็ก · ผู้ดูแล (`SV-CR-015`) */
+  UPDATED: 'UPDATED',
 } as const;
 export type ChatEventKind = (typeof ChatEventKind)[keyof typeof ChatEventKind];
 
