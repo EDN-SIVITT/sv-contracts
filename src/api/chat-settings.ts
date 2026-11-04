@@ -11,6 +11,8 @@ export const CHAT_RESPONSE_STATUS_DEFAULT_ENABLED = true;
 export const CHAT_RESPONSE_OVERDUE_DEFAULT_MINUTES = 5;
 /** `chat.lineReadReceiptEnabled` — ตอบ/รับทราบแล้วส่ง "อ่านแล้ว" ให้ผู้บริจาคใน LINE */
 export const CHAT_LINE_READ_RECEIPT_DEFAULT_ENABLED = true;
+/** `chat.threadsPerPage` — ห้องต่อหน้าของช่องรายชื่อเมื่อยังไม่มีแถว/ค่าเสีย (`SV-CR-016` §2 · ต้องอยู่ใน `PAGINATION_OPTIONS`) */
+export const CHAT_THREADS_PER_PAGE_DEFAULT = 50;
 
 /** แฟล็ก 1 ตัว — `color` = `#RRGGBB` (ตัวพิมพ์ใหญ่) · `label.en` ว่าง = ใช้ `label.th` */
 export interface ChatFlag {

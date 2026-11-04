@@ -15,6 +15,8 @@ export * from './api/chat-settings';
 export * from './api/chat-donor';
 export * from './api/addresses';
 export * from './api/donors';
+export * from './api/donor-groups';
+export * from './api/share-links';
 export * from './api/sequence-code';
 export * from './api/souvenirs';
 export * from './api/orders';

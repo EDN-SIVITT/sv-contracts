@@ -1,7 +1,8 @@
 import { PermissionSubject } from '../permissions';
-import { DASHBOARD_DAY_BUCKET_MAX_DAYS, DASHBOARD_EXPIRING_WITHIN_DAYS, ymdAddDays, ymdDiffDays } from './dashboard';
+import { DASHBOARD_DAY_BUCKET_MAX_DAYS, DASHBOARD_EXPIRING_WITHIN_DAYS, ymdAddDays, ymdDiffDays, type DashboardBucket } from './dashboard';
 import { DONATION_COUNTED_STATUSES, DonationStatus, type DonationSource } from './donations';
 import type { DonorLineStatus, DonorRegistrationChannel, DonorStatus } from './donors';
+import { ORDER_RATING_MAX, ORDER_RATING_MIN } from './liff-donor';
 import { OrderStatus, type OrderPrintedFilter } from './orders';
 import type { SouvenirStatus, StockFilter, StockMovementType, StockRefType } from './souvenirs';
 
@@ -22,6 +23,8 @@ export const ReportKey = {
   SHIPPING: 'shipping',
   DISTRIBUTION: 'distribution',
   STOCK: 'stock',
+  /** R7 ความพึงพอใจ (`SV-CR-016` §6 · SV-ADR-124 · `T-176`) */
+  SATISFACTION: 'satisfaction',
 } as const;
 export type ReportKey = (typeof ReportKey)[keyof typeof ReportKey];
 
@@ -42,6 +45,7 @@ export const REPORT_SOURCE_SUBJECTS: Readonly<Record<ReportKey, readonly Permiss
   shipping: [PermissionSubject.ORDERS],
   distribution: [PermissionSubject.ORDERS],
   stock: [PermissionSubject.SOUVENIRS],
+  satisfaction: [PermissionSubject.ORDERS],
 };
 
 /** ส่งออก Excel ได้สูงสุดกี่แถว (ตารางรายการ) — เกิน = 422 `REPORT_TOO_MANY_ROWS` `{ limit, total }` ให้กรองแคบลง */
@@ -1054,3 +1058,195 @@ export type StockReportView = ReportEnvelope<typeof ReportKey.STOCK, StockReport
 };
 
 export type StockReportExportView = StockReportView & { export: ReportExportMeta };
+
+// ── R7 ความพึงพอใจ (`/reports/satisfaction` · `SV-CR-016` §6 · SV-ADR-124 · `T-176`) ───────────────────
+
+/**
+ * นิยามกลาง (Dashboard ส่วน `satisfaction` + R7 ใช้ชุดเดียว — ไม่ hardcode เลขที่อื่น):
+ * ฐาน = `order_ratings` (1 แถวต่อออเดอร์) ของออเดอร์ที่ไม่ลบ · ช่วงวันที่ = **วันไทยของเวลาให้คะแนนครั้งแรก** (`created_at` — แก้คะแนนภายหลัง = ค่าคะแนนใหม่ แต่คงวันเดิม ·
+ * ตัวเลขของช่วงที่ปิดแล้วไม่ย้ายช่วง) · เฉลี่ยทศนิยม 2 ปัดครึ่งขึ้น (จำนวนเต็มล้วน) · CSAT = คะแนน ≥ `SATISFACTION_CSAT_MIN_RATING` ÷ ทั้งหมด ·
+ * ไม่พอใจ = คะแนน ≤ `SATISFACTION_LOW_MAX_RATING` ÷ ทั้งหมด · แถวที่ n < `SATISFACTION_LOW_SAMPLE_BELOW` = "ข้อมูลน้อย" (`lowSample`)
+ */
+export const SATISFACTION_CSAT_MIN_RATING = 4;
+export const SATISFACTION_LOW_MAX_RATING = 2;
+export const SATISFACTION_LOW_SAMPLE_BELOW = 5;
+/** ทุกระดับคะแนน 1 → 5 (`ORDER_RATING_MIN..MAX`) — `distribution[i]` = จำนวนของ `SATISFACTION_RATINGS[i]` */
+export const SATISFACTION_RATINGS: readonly number[] = Array.from({ length: ORDER_RATING_MAX - ORDER_RATING_MIN + 1 }, (_, index) => ORDER_RATING_MIN + index);
+/** ระดับของ "คะแนนต่ำ — ควรติดตาม" (ลิงก์ R7 `?rating=1,2`) */
+export const SATISFACTION_LOW_RATINGS: readonly number[] = SATISFACTION_RATINGS.filter((rating) => rating <= SATISFACTION_LOW_MAX_RATING);
+
+/** ตัวเลขของชุดคะแนน 1 ชุด (ทั้งช่วง · 1 bucket · 1 แถวแยกกลุ่ม) — คิดจาก `distribution` ล้วน (`satisfactionStatsOf`) */
+export interface SatisfactionStats {
+  count: number;
+  /** Σ คะแนน (จำนวนเต็ม) */
+  ratingSum: number;
+  /** เฉลี่ย `"4.52"` · ไม่มีคะแนน = `null` */
+  average: string | null;
+  /** % ของคะแนน ≥ 4 (`percentText` · `"92.50"`) · ไม่มีคะแนน = `null` */
+  csatPercent: string | null;
+  /** % ของคะแนน ≤ 2 · ไม่มีคะแนน = `null` */
+  dissatisfiedPercent: string | null;
+  /** จำนวนต่อระดับ ครบ 5 ช่องเสมอ — index 0 = 1 ดาว … 4 = 5 ดาว (Σ = `count`) */
+  distribution: number[];
+}
+
+/**
+ * อัตราการตอบ — `received` = ออเดอร์ที่รับแล้วในช่วง (`received_at` ในช่วง · ไม่ยกเลิก · ไม่ลบ = Dashboard `orders.received.count`) ·
+ * `rated` = ในนั้นที่มีคะแนน (ให้เมื่อไรก็ได้ — คะแนนที่มาช้าทำให้ตัวเลขช่วงเก่าเพิ่มได้) · `percent` = `rated ÷ received` · ไม่มีออเดอร์รับแล้ว = `null`
+ */
+export interface SatisfactionResponseRate {
+  received: number;
+  rated: number;
+  percent: string | null;
+}
+
+/** ตัวเลขของ 1 ช่วง (ช่วงนี้ / ช่วงก่อน) */
+export interface SatisfactionPeriod extends SatisfactionStats {
+  responseRate: SatisfactionResponseRate;
+}
+
+/** เฉลี่ยทศนิยม 2 ปัดครึ่งขึ้นจาก Σ คะแนน ÷ จำนวน (จำนวนเต็มล้วน) · 0 = `null` */
+export function satisfactionAverageText(ratingSum: number, count: number): string | null {
+  if (!Number.isSafeInteger(ratingSum) || !Number.isSafeInteger(count) || ratingSum < 0 || count < 0) throw new RangeError(`satisfactionAverageText: ${ratingSum}/${count}`);
+  if (count === 0) return null;
+  const hundredths = Math.floor((ratingSum * 200 + count) / (2 * count));
+  return `${Math.floor(hundredths / 100)}.${String(hundredths % 100).padStart(2, '0')}`;
+}
+
+/** `distribution` (5 ช่อง · index 0 = 1 ดาว) → ตัวเลขทั้งชุด — ขาด/เกินช่อง หรือค่าไม่ใช่จำนวนเต็มบวก = RangeError */
+export function satisfactionStatsOf(distribution: readonly number[]): SatisfactionStats {
+  if (distribution.length !== SATISFACTION_RATINGS.length || distribution.some((n) => !Number.isSafeInteger(n) || n < 0)) {
+    throw new RangeError(`satisfactionStatsOf: ${distribution.join(',')}`);
+  }
+  let count = 0;
+  let ratingSum = 0;
+  let satisfied = 0;
+  let dissatisfied = 0;
+  SATISFACTION_RATINGS.forEach((rating, index) => {
+    const n = distribution[index];
+    count += n;
+    ratingSum += rating * n;
+    if (rating >= SATISFACTION_CSAT_MIN_RATING) satisfied += n;
+    if (rating <= SATISFACTION_LOW_MAX_RATING) dissatisfied += n;
+  });
+  return {
+    count,
+    ratingSum,
+    average: satisfactionAverageText(ratingSum, count),
+    csatPercent: count > 0 ? percentText(satisfied, count) : null,
+    dissatisfiedPercent: count > 0 ? percentText(dissatisfied, count) : null,
+    distribution: [...distribution],
+  };
+}
+
+/** `"1,2"` / `"2,1,2"` → `[1, 2]` (เรียง · ไม่ซ้ำ) · ว่าง/ค่าแปลก = `null` (ทุกระดับ) — API (หลัง DTO ตรวจรูปแบบ) และเว็บ (ค่าใน URL) ใช้ตัวเดียวกัน */
+export function satisfactionRatingsOf(raw: string | null | undefined): number[] | null {
+  const parts = (raw ?? '').split(',').map((part) => part.trim()).filter(Boolean);
+  if (parts.length === 0 || !parts.every((part) => /^\d$/.test(part) && SATISFACTION_RATINGS.includes(Number(part)))) return null;
+  const ratings = [...new Set(parts.map(Number))].sort((a, b) => a - b);
+  return ratings.length === SATISFACTION_RATINGS.length ? null : ratings;
+}
+
+/** มุมมองแยกกลุ่มของ R7 — ของที่ระลึก (สินค้าในออเดอร์ที่ได้คะแนน · ออเดอร์หลายชิ้น = นับให้ทุกสินค้า) · ขนส่ง · กลุ่มผู้บริจาค (ณ ตอนนี้) · กองทุน · แคมเปญ (ของรายการบริจาคต้นทาง) */
+export const SatisfactionBreakdown = {
+  SOUVENIR: 'SOUVENIR',
+  CARRIER: 'CARRIER',
+  DONOR_GROUP: 'DONOR_GROUP',
+  FUND: 'FUND',
+  CAMPAIGN: 'CAMPAIGN',
+} as const;
+export type SatisfactionBreakdown = (typeof SatisfactionBreakdown)[keyof typeof SatisfactionBreakdown];
+export const SATISFACTION_BREAKDOWNS = Object.values(SatisfactionBreakdown) as readonly SatisfactionBreakdown[];
+
+/** ตัวกรองตารางความเห็น — `YES` มีความเห็นเท่านั้น · `NO` ไม่มีความเห็น */
+export const SatisfactionCommentedFilter = {
+  YES: 'YES',
+  NO: 'NO',
+} as const;
+export type SatisfactionCommentedFilter = (typeof SatisfactionCommentedFilter)[keyof typeof SatisfactionCommentedFilter];
+
+/**
+ * query ของ `GET /reports/satisfaction` — ช่วงวันที่คุมทุกส่วน · `rating` (`"1,2"`) + `commented` กรอง**เฉพาะตารางความเห็น** (KPI/แนวโน้ม/แยกกลุ่ม = ทุกคะแนนในช่วง) ·
+ * `page`/`pageSize` = หน้าของตารางความเห็น (เรียงล่าสุดก่อน)
+ */
+export interface SatisfactionReportQuery extends ReportPagingQuery {
+  from?: string;
+  to?: string;
+  rating?: string;
+  commented?: SatisfactionCommentedFilter;
+}
+
+export type SatisfactionReportExportQuery = Omit<SatisfactionReportQuery, 'page' | 'pageSize'> & { format: ReportExportFormat };
+
+export interface SatisfactionReportFilters {
+  /** ระดับที่กรอง (เรียง) · `null` = ทุกระดับ */
+  ratings: number[] | null;
+  commented: SatisfactionCommentedFilter | null;
+}
+
+/** KPI = ช่วงนี้ (นิยามเดียวกับ Dashboard ส่วน `satisfaction`) + ช่วงก่อน (`dashboardPreviousRange`) · `count` = คะแนนในช่วง */
+export interface SatisfactionReportKpis extends SatisfactionPeriod {
+  /** คะแนน ≤ 2 ในช่วง */
+  lowCount: number;
+  previous: SatisfactionPeriod;
+  previousRange: { from: string; to: string };
+}
+
+/** 1 bucket ของแนวโน้ม (bucket แบบกราฟ Dashboard · ครบทุก bucket ต่อเนื่อง) — ไม่มีคะแนน = `count` 0 · `average` `null` */
+export interface SatisfactionTrendPoint extends SatisfactionStats {
+  bucketStart: string;
+}
+
+/**
+ * แถวแยกกลุ่ม — `key` = id หรือ `none` (ไม่ระบุ: ไม่มีขนส่งในรายชื่อ · ไม่มีกลุ่ม/ผู้บริจาคถูกลบ/กลุ่มถูกลบ · ไม่มีรายการบริจาคต้นทาง/ไม่ระบุกองทุน/แคมเปญ) ·
+ * SOUVENIR: รหัส/ชื่อ = snapshot บรรทัดล่าสุด (แบบ R5) · FUND `parentName` = โปรแกรม (ชั้นเปิดเท่านั้น) · CAMPAIGN `parentName` = กองทุนของแคมเปญ · DONOR_GROUP `color` = สีกลุ่ม
+ */
+export interface SatisfactionBreakdownRow extends SatisfactionStats {
+  key: string;
+  code: string | null;
+  name: string | null;
+  parentName: string | null;
+  color: string | null;
+  inactive: boolean;
+  deleted: boolean;
+  /** `count < SATISFACTION_LOW_SAMPLE_BELOW` */
+  lowSample: boolean;
+}
+
+/** ของที่ระลึกในออเดอร์ (snapshot ในบรรทัด · ลำดับบรรทัด) */
+export interface SatisfactionCommentSouvenir {
+  name: string;
+  qty: number;
+}
+
+export interface SatisfactionCommentRow {
+  /** `order_ratings.id` */
+  id: string;
+  rating: number;
+  comment: string | null;
+  /** เวลาให้คะแนนครั้งแรก (ฐานของช่วง) */
+  ratedAt: string;
+  /** แก้คะแนน/ความเห็นภายหลัง = เวลาล่าสุด · ไม่เคยแก้ = `null` */
+  editedAt: string | null;
+  orderId: string;
+  orderNo: string;
+  donorId: string | null;
+  donorCode: string | null;
+  donorName: string | null;
+  donorDeleted: boolean;
+  souvenirs: SatisfactionCommentSouvenir[];
+}
+
+/**
+ * ตาราง — `trend` (bucket ตามความยาวช่วง) · `breakdowns` ครบทุกมุมมอง (เรียง n มาก → เฉลี่ยต่ำ → ชื่อ · "ไม่ระบุ" ท้าย) ·
+ * `comments` = ความเห็นตามตัวกรอง เรียงล่าสุดก่อน (บนจอ = 1 หน้า · export = ทุกแถว · PDF > `REPORT_PRINT_MAX_ROWS` = `null` + `omitted`)
+ */
+export interface SatisfactionReportTables {
+  trend: { bucket: DashboardBucket; points: SatisfactionTrendPoint[] };
+  breakdowns: Record<SatisfactionBreakdown, SatisfactionBreakdownRow[]>;
+  comments: ReportTablePage<SatisfactionCommentRow> | null;
+}
+
+export type SatisfactionReportView = ReportEnvelope<typeof ReportKey.SATISFACTION, SatisfactionReportFilters, SatisfactionReportKpis, SatisfactionReportTables>;
+
+export type SatisfactionReportExportView = SatisfactionReportView & { export: ReportExportMeta };

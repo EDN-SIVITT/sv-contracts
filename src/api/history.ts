@@ -90,7 +90,7 @@ export const RECORD_HISTORY_FIELDS = {
   [PermissionSubject.FUNDS]: ['code', 'name', 'program', 'description', 'status'],
   [PermissionSubject.CAMPAIGNS]: ['code', 'name', 'fund', 'description', 'year', 'startDate', 'endDate', 'targetAmount', 'status'],
   /** `address` = ข้อความประกอบภาษาไทยตาม `format` (แบบที่ใช้ส่งของ) · ไม่มี LINE userId / URL รูป / ยอดบริจาค (`T-148`) */
-  [PermissionSubject.DONORS]: ['fullName', 'phone', 'email', 'lineId', 'taxId', 'address', 'status'],
+  [PermissionSubject.DONORS]: ['fullName', 'phone', 'email', 'lineId', 'taxId', 'address', 'status', 'donorGroup'],
 } as const satisfies Record<RecordHistoryMenu, readonly string[]>;
 export type RecordHistoryField = (typeof RECORD_HISTORY_FIELDS)[RecordHistoryMenu][number];
 

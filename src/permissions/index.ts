@@ -3,7 +3,8 @@
  * SV-BASE เหลือ 6 เมนู (SVB-KEEP-07) · เพิ่มเมนูใหม่ในระบบลูก → เพิ่ม key ที่นี่ + `nav.<key>` ใน locale (สูตรใน T-053)
  * ระบบลูก e-Donation เพิ่ม `donors` (ผู้บริจาค · `SV-CR-003` · SV-ADR-043) · `souvenirs` + `orders` (`SV-CR-004` · SV-ADR-050 · `T-077`)
  * · `donations` (รายการบริจาค · `SV-CR-005` · SV-ADR-053 · `T-084`) · `programs` + `funds` + `campaigns` (โครงสร้างการรับบริจาค · `SV-CR-006` · SV-ADR-086/087 · `T-125`) · `contact_channels` (`SV-CR-009` · SV-ADR-094 · `T-136`) · `reports` (`SV-CR-009` · SV-ADR-095 · `T-138`)
- * — ลำดับที่นี่ = ลำดับแถวในเมทริกซ์สิทธิ์ (ตรงกับ sidebar: Dashboard → Chat → ผู้บริจาค → รายการบริจาค → ออเดอร์ → [โปรแกรม → กองทุน → แคมเปญ] → ของที่ระลึก → … · SV-ADR-089 → SV-ADR-093 · `T-135`)
+ * · `donor_groups` (กลุ่มผู้บริจาค · `SV-CR-016` §4 · SV-ADR-121 · `T-173` — ต่อจาก `donors`)
+ * — ลำดับที่นี่ = ลำดับแถวในเมทริกซ์สิทธิ์ (ตรงกับ sidebar: Dashboard → Chat → ผู้บริจาค → กลุ่มผู้บริจาค → รายการบริจาค → ออเดอร์ → [โปรแกรม → กองทุน → แคมเปญ] → ของที่ระลึก → … · SV-ADR-089 → SV-ADR-093 · `T-135`)
  * กลุ่ม root admin ได้สิทธิ์เต็มอัตโนมัติผ่าน flag `isSuperAdmin` ไม่ใช่ permission rows (REQ-GRP-011)
  */
 export const PermissionSubject = {
@@ -11,6 +12,11 @@ export const PermissionSubject = {
   CHAT: 'chat',
   /** ผู้บริจาค (e-Donation) — READ_ONLY ดู · MAINTAIN เพิ่ม/แก้/ยกเลิกผูก LINE · FULL ลบ (`REQ-DNR-*`) */
   DONORS: 'donors',
+  /**
+   * กลุ่มผู้บริจาค (e-Donation · เมนูต่อจาก "ผู้บริจาค" ไม่ใช่กลุ่มเมนู) — READ_ONLY ดู list/view · MAINTAIN เพิ่ม/แก้/ไอคอน/ตั้ง-เลิก default · FULL ลบ (soft · ผู้บริจาคในกลุ่ม → ไม่มีกลุ่ม) ·
+   * รายชื่อผู้บริจาคในกลุ่มต้องมี `donors` ≥ READ_ONLY ด้วย · ตัวเลือกในฟอร์มผู้บริจาคใช้สิทธิ์ `donors` (`REQ-DGR-*` · `SV-CR-016` §4 · SV-ADR-121)
+   */
+  DONOR_GROUPS: 'donor_groups',
   /** รายการบริจาค (e-Donation) — READ_ONLY ดู list/view/สลิป · MAINTAIN สร้าง/แก้/ยืนยัน/ปฏิเสธ/อัปโหลด-ลบสลิป · FULL ลบ (soft · ทุกสถานะ) (`REQ-DNT-*` · `SV-CR-005` ข้อ 3.1) */
   DONATIONS: 'donations',
   /** ออเดอร์จัดส่งของที่ระลึก (e-Donation) — READ_ONLY ดู/พิมพ์ใบแปะหน้า · MAINTAIN สร้าง/แก้/ยืนยัน/จัดส่ง/ยกเลิก/บันทึกว่าพิมพ์แล้ว · FULL ลบ (ร่างเท่านั้น) (`REQ-ORD-*`) */

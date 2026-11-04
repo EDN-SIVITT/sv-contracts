@@ -96,6 +96,16 @@ export const AuthRateLimitScope = {
   DONOR_AVATAR_UPLOAD: 'DONOR_AVATAR_UPLOAD',
   /** ผู้บริจาคแจ้งการบริจาคเองจากหน้า LINE OA (`SV-CR-012` · SV-ADR-103) — identifier = LINE userId (+ IP) · กันส่งรัว/ใช้ sharp/storage รัว */
   DONOR_DONATION_REPORT: 'DONOR_DONATION_REPORT',
+  /**
+   * เปิดลิงก์แชร์ที่**ไม่พบ** (404 `SHARE_LINK_NOT_FOUND`) จากหน้า LINE OA (`SV-CR-016` §8 · SV-ADR-126 · `T-178`) — identifier = LINE userId (+ IP) ·
+   * นับเฉพาะผลที่ไม่พบ (ลิงก์ของตัวเองเปิดได้เสมอ) · กันไล่เดา code · เกิน = 429 `AUTH_RATE_LIMITED`
+   */
+  LIFF_SHARE_LINK_MISS: 'LIFF_SHARE_LINK_MISS',
+  /**
+   * ตอบ "ยืนยันตัวตนอีกขั้น" ผิด (ผูกบัญชีกับผู้บริจาคเดิมที่มีประวัติ · `T-178` · SV-ADR-126) — identifier = LINE userId (+ IP) ·
+   * นอกจากเพดาน `DONOR_IDENTITY_CHECK_MAX_ATTEMPTS` ต่อ verification token (นับใน `donor_otps`) · กันไล่เดาข้ามหลาย token
+   */
+  DONOR_IDENTITY_CHECK: 'DONOR_IDENTITY_CHECK',
 } as const;
 export type AuthRateLimitScope =
   (typeof AuthRateLimitScope)[keyof typeof AuthRateLimitScope];

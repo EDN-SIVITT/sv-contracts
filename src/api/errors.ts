@@ -91,6 +91,16 @@ export const ErrorCode = {
   DONOR_PROFILE_STALE: 'DONOR_PROFILE_STALE',
   /** แก้ข้อมูลส่วนตัว/รูปจากหน้า LINE OA ทั้งที่ยังไม่ได้กรอกฟอร์มสมัคร (409 · `SV-CR-011`) — หน้าเว็บพาไปหน้าสมัคร */
   DONOR_REGISTRATION_REQUIRED: 'DONOR_REGISTRATION_REQUIRED',
+  /**
+   * ยืนยันตัวตนอีกขั้นไม่ตรง (ผูกกับผู้บริจาคเดิมที่มีประวัติ · `T-178` · SV-ADR-126 · `REQ-DNL-022`) — 422 `details { remainingAttempts }` ·
+   * ข้อความกลางเดียว (ไม่บอกว่าผิดตรงไหน/ค่าที่ถูก) · `remainingAttempts = 0` = verification token ถูกปิดแล้ว → ขอ OTP ใหม่
+   */
+  DONOR_IDENTITY_MISMATCH: 'DONOR_IDENTITY_MISMATCH',
+  /**
+   * ผูกบัญชีกับผู้บริจาคเดิมที่มีประวัติโดยยังไม่ผ่านการยืนยันตัวตนอีกขั้น (409 · ประเมินใหม่ใต้ล็อก — เช่นเจ้าหน้าที่เพิ่งสร้าง/บันทึกรายการให้เบอร์นี้คั่นกลาง) ·
+   * token ถูกปิดแล้ว → เริ่มยืนยันเบอร์ใหม่ (`T-178`)
+   */
+  DONOR_IDENTITY_CHECK_REQUIRED: 'DONOR_IDENTITY_CHECK_REQUIRED',
   // ── ของที่ระลึก · สต็อกแบบ lot · ออเดอร์ (`SV-CR-004` · FT-15/FT-16 · SV-ADR-050 · `T-077`) ──
   /** รหัสสินค้าซ้ำ (unique รวมแถวที่ลบแล้ว) — 422 `details { field: 'code' }` */
   SOUVENIR_CODE_TAKEN: 'SOUVENIR_CODE_TAKEN',
@@ -238,6 +248,13 @@ export const ErrorCode = {
   CONTACT_CHANNELS_LIMIT: 'CONTACT_CHANNELS_LIMIT',
   /** ลำดับที่ส่งมาไม่ใช่ชุด id ครบของแถวที่ยังไม่ลบ (ขาด · เกิน · ซ้ำ · ถูกลบ) — 422 `details { field: 'ids', reason }` (`ContactChannelOrderProblem`) · กันลากวางชนกัน */
   CONTACT_CHANNEL_ORDER_INVALID: 'CONTACT_CHANNEL_ORDER_INVALID',
+  // ── กลุ่มผู้บริจาค (`SV-CR-016` §4 · FT-21 · SV-ADR-121/122 · `T-173`) — ไอคอนใช้ `FILE_*` / `IMAGE_DIMENSIONS_INVALID` แบบช่องทางติดต่อ ──
+  /** ไม่พบกลุ่มผู้บริจาค (ไม่มี/ถูกลบ/id ไม่ใช่ตัวเลข) — 404 `details { id }` */
+  DONOR_GROUP_NOT_FOUND: 'DONOR_GROUP_NOT_FOUND',
+  /** ชื่อกลุ่มซ้ำกับกลุ่มที่ยังไม่ลบ (ไม่สนตัวพิมพ์) — 422 `details { field: 'name', name }` */
+  DONOR_GROUP_NAME_TAKEN: 'DONOR_GROUP_NAME_TAKEN',
+  /** `groupId` ของผู้บริจาค (ฟอร์มเมนูผู้บริจาค · สร้างจาก Chat) ไม่มีอยู่หรือถูกลบ — 422 `details { field: 'groupId', groupId }` (ตรวจใต้ล็อกตอนบันทึก) */
+  DONOR_GROUP_UNAVAILABLE: 'DONOR_GROUP_UNAVAILABLE',
   // ── รายงาน (`SV-CR-009` ข้อ 2 · FT-19 · SV-ADR-095/096 · `T-138`) ──
   /** ส่งออกรายงานเกิน `REPORT_EXPORT_MAX_ROWS` แถว — 422 `details { limit, total }` (นับก่อนดึงแถว · ให้กรองแคบลง) */
   REPORT_TOO_MANY_ROWS: 'REPORT_TOO_MANY_ROWS',
@@ -250,6 +267,15 @@ export const ErrorCode = {
   DONATION_SOUVENIR_OUT_OF_STOCK: 'DONATION_SOUVENIR_OUT_OF_STOCK',
   /** ให้คะแนนออเดอร์ที่ยังไม่ "รับสินค้าแล้ว" — 409 `details { status }` */
   ORDER_RATING_NOT_ALLOWED: 'ORDER_RATING_NOT_ALLOWED',
+  // ── ลิงก์แชร์รายการให้ผู้บริจาค (`SV-CR-016` §7 · SV-ADR-125 · `T-177`) — เปิดลิงก์ไม่พบ/ไม่ใช่เจ้าของ = `NOT_FOUND` เดียวกัน ──
+  /** ผู้บริจาคของรายการยังไม่ผูกบัญชี LINE (หรือถูกลบ) — สร้างลิงก์ไม่ได้ 422 `details { donorId }` */
+  SHARE_LINK_DONOR_NOT_LINKED: 'SHARE_LINK_DONOR_NOT_LINKED',
+  /** ยังไม่ตั้ง LIFF ID ของ LINE channel หลัก (ตั้งค่า → LINE) — สร้างลิงก์ไม่ได้ 422 `details { field: 'line.main.liffId' }` */
+  SHARE_LINK_LIFF_NOT_CONFIGURED: 'SHARE_LINK_LIFF_NOT_CONFIGURED',
+  /** หน้า LINE OA เปิดลิงก์แชร์ไม่ได้ — ไม่มี code นี้ · รูปแบบผิด · ไม่ใช่เจ้าของปัจจุบัน · รายการถูกลบ = 404 ข้อความเดียวกัน (ไม่บอกว่ามีอยู่) */
+  SHARE_LINK_NOT_FOUND: 'SHARE_LINK_NOT_FOUND',
+  /** สุ่ม code ชนกันเกิน 5 ครั้งติด (แทบเป็นไปไม่ได้) — 409 ลองใหม่ได้ */
+  SHARE_LINK_CODE_CONFLICT: 'SHARE_LINK_CODE_CONFLICT',
   /** ใช้กับ validation error ทั่วไปที่ไม่มี code เฉพาะ */
   VALIDATION_FAILED: 'VALIDATION_FAILED',
   NOT_FOUND: 'NOT_FOUND',

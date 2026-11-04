@@ -1,13 +1,17 @@
 import type { DonationStatus } from './donations';
+import type { DonorGroupRef } from './donor-groups';
 import { OrderStatus } from './orders';
+import type { SatisfactionPeriod } from './reports';
 import type { StockFilter } from './souvenirs';
 
 /**
  * Dashboard ของ e-Donation (`T-121` API · `T-122` เว็บ · FT-12 · SV-ADR-083) — `GET /dashboard/summary?from&to`
  * วันที่ทุกตัว = `YYYY-MM-DD` **ตามวันไทย** (Asia/Bangkok) · ช่วงรวมปลายทาง · ฟังก์ชันวันที่ในไฟล์นี้คิดจากตัวเลขปฏิทินล้วน (ไม่พึ่ง timezone ของเครื่อง)
  * เงินทุกช่อง = ข้อความ DECIMAL `"1234.50"` (รวมใน SQL · ไม่ผ่าน float — `parseMoneyToSatang` / `formatSatang`)
- * แต่ละส่วน (`donations` · `fundraising` · `donors` · `orders` · `souvenirs` · `chat`) = `null` เมื่อผู้ใช้ไม่มีสิทธิ์อ่านเมนูนั้น (ไม่ใช่ 403 · API ไม่ query ส่วนนั้นเลย)
+ * แต่ละส่วน (`donations` · `fundraising` · `donors` · `orders` · `satisfaction` · `souvenirs` · `chat`) = `null` เมื่อผู้ใช้ไม่มีสิทธิ์อ่านเมนูนั้น (ไม่ใช่ 403 · API ไม่ query ส่วนนั้นเลย)
  * v2 (`T-144` · SV-ADR-099): `fundraising` (สิทธิ์ `donations`) · `souvenirs.preorder` · `orders.awaitingStock` — ตัวเลขทุกตัวนิยามเดียวกับหน้าปลายทางที่ลิงก์ไป
+ * `SV-CR-016` §4 (`T-173` · SV-ADR-122): `donorGroups` (สิทธิ์ `donors` · ยอดต้องมี `donations`)
+ * `SV-CR-016` §6 (`T-176` · SV-ADR-124): `satisfaction` (สิทธิ์ `orders` · นิยามกลางใน `reports.ts` — `satisfactionStatsOf`)
  */
 
 /** ช่วงยาวสุดที่ขอได้ (วัน · รวมปลายทาง) — 1 ปีอธิกสุรทิน · เกิน → 422 `{ field: 'to', reason: 'TOO_LONG', max }` */
@@ -399,6 +403,52 @@ export interface DashboardShortageItem {
   shortage: number;
 }
 
+/**
+ * ตัวเลขของกลุ่มผู้บริจาค 1 กลุ่ม (หรือ "ไม่มีกลุ่ม") ใน Dashboard (`SV-CR-016` §4 · SV-ADR-122 · `REQ-DSH-031`) —
+ * ช่องยอด (`revenue` · `activeDonors` · `averagePerDonor` · `sharePercent`) ต้องมีสิทธิ์ `donations` ด้วย ไม่มี = `null` (ไม่ query)
+ */
+export interface DashboardDonorGroupStats {
+  /** ผู้บริจาคทั้งหมดตอนนี้ (ไม่นับที่ลบ) — ไม่ขึ้นกับช่วง */
+  donorCount: number;
+  /** ผู้บริจาคที่สร้างในช่วง (`createdAt` ตามวันไทย · ไม่นับที่ลบ) */
+  newCount: number;
+  /**
+   * รายรับในช่วง (นิยามเดียวกับ `donations.revenue`) แยกตามกลุ่มของผู้บริจาค **ณ ตอนนี้** —
+   * Σ ทุกกลุ่ม + `ungrouped` = `donations.revenue` (สตางค์) · รายการของผู้บริจาคที่ถูกลบ/กลุ่มที่ถูกลบ นับใน `ungrouped`
+   */
+  revenue: DashboardCountAmount | null;
+  /** ผู้บริจาค (ที่ยังไม่ลบ) ที่มีรายการนับรายรับในช่วง — Σ ทุกกลุ่ม + `ungrouped` = `donors.activeCount` */
+  activeDonors: number | null;
+  /** `revenue.amount / activeDonors` ปัดครึ่งขึ้นที่สตางค์ · ไม่มีผู้บริจาค = `"0.00"` */
+  averagePerDonor: string | null;
+  /** `revenue.amount / donations.revenue.amount × 100` ทศนิยม 1 ตำแหน่ง · รายรับรวม 0 = `null` */
+  sharePercent: number | null;
+}
+
+export interface DashboardDonorGroupRow extends DashboardDonorGroupStats {
+  group: DonorGroupRef;
+}
+
+/**
+ * ผู้บริจาคตามกลุ่ม (สิทธิ์ `donors` · ยอดต้องมี `donations` ด้วย) — `groups` = ทุกกลุ่มที่ยังไม่ลบ (รวมกลุ่มที่ยังไม่มีคน)
+ * เรียงยอดในช่วงมาก → ผู้บริจาคมาก → ชื่อ → id (ไม่มีสิทธิ์ `donations` = ผู้บริจาคมาก → ชื่อ → id) · ลิงก์ `/donors?groupId=<id>` / `none`
+ */
+export interface DashboardDonorGroupsSection {
+  groups: DashboardDonorGroupRow[];
+  ungrouped: DashboardDonorGroupStats;
+}
+
+/**
+ * ความพึงพอใจผู้บริจาค (`SV-CR-016` §6 · SV-ADR-124 · `REQ-DSH-032`) — สิทธิ์ `orders` · คะแนนจากหน้า LINE OA หลังรับของ (`order_ratings`) ตามวันไทยของเวลาให้คะแนนครั้งแรก ·
+ * ตัวเลขชุดเดียวกับ KPI ของรายงาน R7 (`/reports/satisfaction` — SQL ตัวเดียวกัน)
+ */
+export interface DashboardSatisfactionSection extends SatisfactionPeriod {
+  /** คะแนน ≤ `SATISFACTION_LOW_MAX_RATING` ในช่วง — "คะแนนต่ำ ควรติดตาม" → R7 `?rating=1,2` */
+  lowCount: number;
+  /** ช่วงก่อน (`dashboardPreviousRange`) — นิยามเดียวกัน */
+  previous: SatisfactionPeriod;
+}
+
 /** นิยามเดียวกับ `GET /chat/unread` (`threads` · `messages`) */
 export interface DashboardChatSection {
   unreadThreads: number;
@@ -413,7 +463,11 @@ export interface DashboardSummaryView {
   /** สิทธิ์ `donations` (ชื่อกองทุน/แคมเปญเห็นใน list รายการบริจาคอยู่แล้ว — SV-ADR-099) */
   fundraising: DashboardFundraisingSection | null;
   donors: DashboardDonorsSection | null;
+  /** กลุ่มผู้บริจาค (`SV-CR-016` §4) — สิทธิ์ `donors` (เหมือนส่วน `donors`) */
+  donorGroups: DashboardDonorGroupsSection | null;
   orders: DashboardOrdersSection | null;
+  /** ความพึงพอใจผู้บริจาค (`SV-CR-016` §6) — สิทธิ์ `orders` (เหมือนส่วน `orders`) */
+  satisfaction: DashboardSatisfactionSection | null;
   souvenirs: DashboardSouvenirsSection | null;
   chat: DashboardChatSection | null;
 }

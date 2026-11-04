@@ -1,3 +1,4 @@
+import type { DonorGroupRef } from './donor-groups';
 import { formatSequenceCode } from './sequence-code';
 
 /**
@@ -172,6 +173,11 @@ export interface DonorCreateInput {
   taxId?: string | null;
   status?: DonorStatus;
   address?: DonorAddressInput | null;
+  /**
+   * กลุ่มผู้บริจาค (`SV-CR-016` §4 · SV-ADR-121/122) — id ของกลุ่มที่ยังไม่ลบ · `null` = ไม่มีกลุ่ม · ไม่ส่ง = ไม่มีกลุ่ม (สร้าง) / ไม่แตะค่าเดิม (แก้) ·
+   * กลุ่มไม่มี/ถูกลบ = 422 `DONOR_GROUP_UNAVAILABLE { field: 'groupId' }` · ฟอร์มสร้างเลือก default ให้ก่อน (`GET /donors/group-options` → `isDefault`)
+   */
+  groupId?: string | null;
 }
 
 /**
@@ -214,6 +220,8 @@ export interface DonorListItemView {
   donationCount: number;
   /** DECIMAL(15,2) เป็นข้อความ (`"0.00"`) — กันทศนิยมเพี้ยน · เว็บแสดง `1,234.00` */
   donationTotal: string;
+  /** กลุ่มผู้บริจาค (`SV-CR-016` §4) — chip สี + ไอคอน · ไม่มีกลุ่ม = `null` · ลิงก์ `/donor-groups/:id` ตามสิทธิ์ `donor_groups` */
+  group: DonorGroupRef | null;
   /**
    * ห้องแชทของ LINE ที่ผูกอยู่ (`SV-CR-015` §8 · SV-ADR-119) — ปุ่ม "เปิดแชท" ในเมนูผู้บริจาค · ผูกแล้วแต่ยังไม่เคยแชท / ยังไม่ผูก = `null`
    * (ผูกแล้วแต่ยังไม่มีห้อง → `POST /chat/threads/for-donor/:donorId` สร้างห้องเปล่าให้)

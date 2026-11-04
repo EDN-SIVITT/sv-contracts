@@ -1,4 +1,5 @@
 import type { LineChannel } from '../enums/line';
+import { PAGINATION_OPTIONS } from './response';
 import { SMS_PROVIDERS, SmsProvider } from './sms';
 
 /**
@@ -170,6 +171,11 @@ export const SettingKey = {
   CHAT_FLAGS: 'chat.flags',
   /** ตอบ/รับทราบแล้วส่ง "อ่านแล้ว" ให้ผู้บริจาคใน LINE (`markAsRead`) — ค่าเริ่มต้น `CHAT_LINE_READ_RECEIPT_DEFAULT_ENABLED` */
   CHAT_LINE_READ_RECEIPT_ENABLED: 'chat.lineReadReceiptEnabled',
+  /**
+   * จำนวนห้องต่อหน้าของช่องรายชื่อ Chat เมื่อไม่ส่ง `perPage` (`SV-CR-016` §2 · SV-ADR-120 · `REQ-SET-055`) — ค่าใน `SETTING_NUMBER_OPTIONS` (20/50/100) ·
+   * ค่าเริ่มต้น `CHAT_THREADS_PER_PAGE_DEFAULT` (50) · ใช้เฉพาะ `GET /chat/threads` (รายการข้อความไม่เกี่ยว · list อื่นยังใช้ `general.defaultPerPage`)
+   */
+  CHAT_THREADS_PER_PAGE: 'chat.threadsPerPage',
 } as const;
 export type SettingKey = (typeof SettingKey)[keyof typeof SettingKey];
 
@@ -245,6 +251,14 @@ export const SETTING_NUMBER_BOUNDS: Readonly<Record<string, { min: number; max: 
   [SettingKey.ORDER_LABEL_MARGIN_MM]: { min: 0, max: 10 },
   // SV-ADR-115 — 1 นาทีถึง 1 วัน (เกินวันแสดงเป็นวันอยู่แล้ว)
   [SettingKey.CHAT_RESPONSE_OVERDUE_MINUTES]: { min: 1, max: 1440 },
+};
+
+/**
+ * ค่าตัวเลขที่เลือกได้เฉพาะชุดค่า (ไม่ใช่ช่วง) — API ปฏิเสธค่าอื่น/ว่าง = 422 `NOT_ALLOWED` · เว็บวาดเป็น select · `SV-CR-016` §2
+ * (`general.defaultPerPage` ยังเป็นแบบเดิมของ HST — ฟอร์มเป็น select อยู่แล้ว · อ่านค่านอกชุด = ตัวแรก)
+ */
+export const SETTING_NUMBER_OPTIONS: Readonly<Record<string, readonly number[]>> = {
+  [SettingKey.CHAT_THREADS_PER_PAGE]: PAGINATION_OPTIONS,
 };
 
 /**

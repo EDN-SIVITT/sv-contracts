@@ -113,15 +113,54 @@ export interface DonorOtpVerifyInput {
 }
 
 /**
+ * ชนิดของ "ยืนยันตัวตนอีกขั้น" หลัง OTP ผ่าน (`T-178` · SV-ADR-126 · `REQ-DNL-022`) — เฉพาะ `LINK_EXISTING` ที่ระเบียนเดิม**มีประวัติ**
+ * (รายการบริจาคหรือออเดอร์ที่ไม่ลบอย่างน้อย 1) · กันเบอร์รีไซเคิล: คนถือเบอร์ใหม่ต้องรู้ข้อมูลของเจ้าของเดิมก่อนเห็น/แก้อะไร
+ */
+export const DonorIdentityCheckKind = {
+  /** ระเบียนมีเลขผู้เสียภาษี → กรอก 4 ตัวท้าย */
+  TAX_ID_LAST4: 'TAX_ID_LAST4',
+  /** ไม่มีเลขผู้เสียภาษี → กรอกชื่อ + นามสกุลที่ลงทะเบียน (เทียบแบบ normalize · ไม่สนตัวพิมพ์/ช่องว่างซ้ำ/คำนำหน้าชื่อ) */
+  FULL_NAME: 'FULL_NAME',
+} as const;
+export type DonorIdentityCheckKind = (typeof DonorIdentityCheckKind)[keyof typeof DonorIdentityCheckKind];
+
+/** ตอบยืนยันตัวตนอีกขั้นผิดได้กี่ครั้งต่อ verification token (นับใน `donor_otps`) — ครบ = ปิด token ต้องขอ OTP ใหม่ */
+export const DONOR_IDENTITY_CHECK_MAX_ATTEMPTS = 5;
+/** 4 ตัวท้ายของเลขผู้เสียภาษี = ตัวเลข 4 หลักพอดี */
+export const DONOR_TAX_ID_LAST4_PATTERN = /^\d{4}$/;
+/** ความยาวสูงสุดของช่องชื่อ / นามสกุลในขั้นยืนยันตัวตน (รวมกันไม่เกิน `full_name` 200) */
+export const DONOR_IDENTITY_NAME_MAX_LENGTH = 100;
+
+/**
  * คำตอบของ `POST …/donor/otp/verify` (OTP ผ่านแล้วเท่านั้น — ผิด/หมดอายุ/ใช้แล้ว = 422 `DONOR_OTP_INVALID` ข้อความกลาง)
  * - `verificationToken` มีเฉพาะ outcome ที่ไปต่อได้ (`DONOR_LINKABLE_OUTCOMES`) · ใช้ครั้งเดียว · อายุ `DONOR_VERIFICATION_TTL_SECONDS`
+ * - `identityCheck` (`T-178`) มีเฉพาะ `LINK_EXISTING` ที่ระเบียนเดิมมีประวัติ → ต้องผ่าน `POST …/donor/identity-check` ก่อนขอ consent/ผูก ·
+ *   ⚠️ ไม่มีข้อมูลใด ๆ ของระเบียนเดิม (ชื่อ · เลขบางส่วน · รหัสผู้บริจาค) ในคำตอบนี้
  * - `message` มีเฉพาะ `SELF_REGISTRATION_DISABLED` (ข้อความจากเมนูตั้งค่าตามภาษา)
  */
 export interface DonorOtpVerifyView {
   outcome: DonorLinkOutcome;
   verificationToken?: string;
   verificationExpiresAt?: string;
+  identityCheck?: DonorIdentityCheckKind;
   message?: string;
+}
+
+/**
+ * body ของ `POST …/donor/identity-check` (`T-178`) — ส่งช่องตามชนิดที่ `otp/verify` บอก:
+ * `TAX_ID_LAST4` = `taxIdLast4` (ตัวเลข 4 หลัก) · `FULL_NAME` = `firstName` + `lastName` (≤ `DONOR_IDENTITY_NAME_MAX_LENGTH`)
+ * ผิด = 422 `DONOR_IDENTITY_MISMATCH { remainingAttempts }` · token ใช้ไม่ได้ = 422 `DONOR_VERIFICATION_INVALID`
+ */
+export interface DonorIdentityCheckInput {
+  verificationToken: string;
+  taxIdLast4?: string;
+  firstName?: string;
+  lastName?: string;
+}
+
+/** คำตอบของ `POST …/donor/identity-check` — ผ่านแล้ว (ไม่มีข้อมูลของระเบียน) → ขอ consent แล้ว `POST …/donor/link` ด้วย token เดิม */
+export interface DonorIdentityCheckView {
+  verified: true;
 }
 
 /** `GET …/donor/consent?locale=` — ข้อความจากเมนูตั้งค่า (th/en) + SHA-256 ของข้อความ (ส่งกลับตอนยอมรับ เพื่อยืนยันว่าเห็นฉบับเดียวกัน) */
