@@ -3,8 +3,9 @@
  * SV-BASE เหลือ 6 เมนู (SVB-KEEP-07) · เพิ่มเมนูใหม่ในระบบลูก → เพิ่ม key ที่นี่ + `nav.<key>` ใน locale (สูตรใน T-053)
  * ระบบลูก e-Donation เพิ่ม `donors` (ผู้บริจาค · `SV-CR-003` · SV-ADR-043) · `souvenirs` + `orders` (`SV-CR-004` · SV-ADR-050 · `T-077`)
  * · `donations` (รายการบริจาค · `SV-CR-005` · SV-ADR-053 · `T-084`) · `programs` + `funds` + `campaigns` (โครงสร้างการรับบริจาค · `SV-CR-006` · SV-ADR-086/087 · `T-125`) · `contact_channels` (`SV-CR-009` · SV-ADR-094 · `T-136`) · `reports` (`SV-CR-009` · SV-ADR-095 · `T-138`)
- * · `donor_groups` (กลุ่มผู้บริจาค · `SV-CR-016` §4 · SV-ADR-121 · `T-173` — ต่อจาก `donors`)
- * — ลำดับที่นี่ = ลำดับแถวในเมทริกซ์สิทธิ์ (ตรงกับ sidebar: Dashboard → Chat → ผู้บริจาค → กลุ่มผู้บริจาค → รายการบริจาค → ออเดอร์ → [โปรแกรม → กองทุน → แคมเปญ] → ของที่ระลึก → … · SV-ADR-089 → SV-ADR-093 · `T-135`)
+ * · `donor_groups` (กลุ่มผู้บริจาค · `SV-CR-016` §4 · SV-ADR-121 · `T-173` — `T-186` ย้ายจากต่อ `donors` ไปต่อ `reports` · SV-ADR-134)
+ * — ลำดับที่นี่ = ลำดับแถวในเมทริกซ์สิทธิ์ (ตรงกับ sidebar: Dashboard → Chat → ผู้บริจาค → รายการบริจาค → ออเดอร์ → [โปรแกรม → กองทุน → แคมเปญ] → [ของที่ระลึก] → รายงาน →
+ *   กลุ่มผู้บริจาค → [ช่องทางติดต่อ] → … · SV-ADR-089 → SV-ADR-093 · `T-135` → SV-ADR-134 · `T-186`)
  * กลุ่ม root admin ได้สิทธิ์เต็มอัตโนมัติผ่าน flag `isSuperAdmin` ไม่ใช่ permission rows (REQ-GRP-011)
  */
 export const PermissionSubject = {
@@ -12,11 +13,6 @@ export const PermissionSubject = {
   CHAT: 'chat',
   /** ผู้บริจาค (e-Donation) — READ_ONLY ดู · MAINTAIN เพิ่ม/แก้/ยกเลิกผูก LINE · FULL ลบ (`REQ-DNR-*`) */
   DONORS: 'donors',
-  /**
-   * กลุ่มผู้บริจาค (e-Donation · เมนูต่อจาก "ผู้บริจาค" ไม่ใช่กลุ่มเมนู) — READ_ONLY ดู list/view · MAINTAIN เพิ่ม/แก้/ไอคอน/ตั้ง-เลิก default · FULL ลบ (soft · ผู้บริจาคในกลุ่ม → ไม่มีกลุ่ม) ·
-   * รายชื่อผู้บริจาคในกลุ่มต้องมี `donors` ≥ READ_ONLY ด้วย · ตัวเลือกในฟอร์มผู้บริจาคใช้สิทธิ์ `donors` (`REQ-DGR-*` · `SV-CR-016` §4 · SV-ADR-121)
-   */
-  DONOR_GROUPS: 'donor_groups',
   /** รายการบริจาค (e-Donation) — READ_ONLY ดู list/view/สลิป · MAINTAIN สร้าง/แก้/ยืนยัน/ปฏิเสธ/อัปโหลด-ลบสลิป · FULL ลบ (soft · ทุกสถานะ) (`REQ-DNT-*` · `SV-CR-005` ข้อ 3.1) */
   DONATIONS: 'donations',
   /** ออเดอร์จัดส่งของที่ระลึก (e-Donation) — READ_ONLY ดู/พิมพ์ใบแปะหน้า · MAINTAIN สร้าง/แก้/ยืนยัน/จัดส่ง/ยกเลิก/บันทึกว่าพิมพ์แล้ว · FULL ลบ (ร่างเท่านั้น) (`REQ-ORD-*`) */
@@ -31,6 +27,12 @@ export const PermissionSubject = {
   SOUVENIRS: 'souvenirs',
   /** รายงาน (e-Donation · `SV-CR-009` ข้อ 2 · SV-ADR-095) — READ_ONLY ดู + ส่งออก Excel/PDF · ไม่มีการเขียน (MAINTAIN/FULL = เท่า READ_ONLY) · ทุกรายงานต้องมี READ_ONLY ของเมนูต้นทางด้วย (`REPORT_SOURCE_SUBJECTS`) */
   REPORTS: 'reports',
+  /**
+   * กลุ่มผู้บริจาค (e-Donation · เมนูเดี่ยว ไม่ใช่กลุ่มเมนู · ต่อจาก "รายงาน" ก่อนกลุ่ม "จัดการเนื้อหา" — `SV-CR-018` §1 · SV-ADR-134 · เดิมต่อจาก "ผู้บริจาค") —
+   * READ_ONLY ดู list/view · MAINTAIN เพิ่ม/แก้/ไอคอน/ตั้ง-เลิก default · FULL ลบ (soft · ผู้บริจาคในกลุ่ม → ไม่มีกลุ่ม) ·
+   * รายชื่อผู้บริจาคในกลุ่มต้องมี `donors` ≥ READ_ONLY ด้วย · ตัวเลือกในฟอร์มผู้บริจาคใช้สิทธิ์ `donors` (`REQ-DGR-*` · `SV-CR-016` §4 · SV-ADR-121)
+   */
+  DONOR_GROUPS: 'donor_groups',
   /** ช่องทางติดต่อ (e-Donation · กลุ่มเมนู "จัดการเนื้อหา") — READ_ONLY ดู · MAINTAIN เพิ่ม/แก้/จัดลำดับ/ไอคอน/แสดง-ซ่อน · FULL ลบ (soft) (`REQ-CNT-*` · `SV-CR-009` ข้อ 3 · SV-ADR-094) */
   CONTACT_CHANNELS: 'contact_channels',
   SYSTEM_USERS: 'system_users',

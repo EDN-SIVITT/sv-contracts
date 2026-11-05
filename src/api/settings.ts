@@ -73,6 +73,11 @@ export const SettingKey = {
   GENERAL_SYSTEM_ICON: 'general.systemIcon',
   /** หน้าจอโหลดเมื่อเปลี่ยนหน้า/เมนูของ CMS (แถบบน + ฉากคลุมพื้นที่เนื้อหา) — `REQ-SET-048` · `REQ-UIX-010` · SV-ADR-055 · ค่าเริ่มต้น `true` */
   GENERAL_PAGE_LOADING_SCREEN: 'general.pageLoadingScreen',
+  /**
+   * เวลาแสดง popup แจ้งผล (toast) success/info ที่ไม่ได้ส่ง `duration` เอง (มิลลิวินาที · 300–30,000) — `REQ-SET-057` · `SV-CR-018` §1 · SV-ADR-134 · `0047` ·
+   * ค่าเริ่มต้น `TOAST_DURATION_DEFAULT_MS` (500) · error ค้างจนกดปิดเสมอ (ไม่ขึ้นกับค่านี้) · ทุกคนได้ค่าทาง `GET /auth/me` `uiPreferences.toastDurationMs`
+   */
+  GENERAL_TOAST_DURATION_MS: 'general.toastDurationMs',
   S3_ENDPOINT: 's3.endpoint',
   S3_REGION: 's3.region',
   S3_BUCKET: 's3.bucket',
@@ -169,6 +174,13 @@ export const SettingKey = {
    * ค่าที่ `0030` ใส่ = `true` เมื่อมีโปรแกรมอยู่แล้ว (site เดิม) ไม่งั้น `false` (site ใหม่) · ปิดแล้วโปรแกรม/ความสัมพันธ์/สิทธิ์เดิมยังอยู่ครบ · ทุกคนรู้ค่าผ่าน `GET /auth/me` `features`
    */
   FUNDRAISING_PROGRAM_ENABLED: 'fundraising.programEnabled',
+  /**
+   * คำนำหน้ารหัสกองทุนอัตโนมัติ 0–10 ตัว `A–Z a–z 0–9 - _` **ขึ้นต้นด้วยตัวอักษร/ตัวเลข** (ว่างได้ = เลขล้วน) — `REQ-SET-058` · `SV-CR-018` §4 · `T-189` ·
+   * ค่าเริ่มต้น `FND` (`FUND_CODE_PREFIX_DEFAULT`) · รหัสที่ได้ต้องผ่าน `FUNDRAISING_CODE_PATTERN` ≤ 30 (10 + 12 หลัก = 22 · SV-ADR-137)
+   */
+  FUNDRAISING_FUND_CODE_PREFIX: 'fundraising.fundCodePrefix',
+  /** จำนวนหลักขั้นต่ำของเลขลำดับรหัสกองทุน 1–12 — `REQ-SET-058` · ค่าเริ่มต้น 4 (`FND0001`) · รหัสที่ออกแล้วไม่เปลี่ยน */
+  FUNDRAISING_FUND_CODE_DIGITS: 'fundraising.fundCodeDigits',
   /** แสดงสถานะการตอบสนอง (จุด 3 สี · ตัวกรอง · ปุ่มรับทราบ) — `SV-CR-015` · SV-ADR-115 · ปิดแล้ว API ยังบันทึกเวลาต่อ · ค่าเริ่มต้น `CHAT_RESPONSE_STATUS_DEFAULT_ENABLED` */
   CHAT_RESPONSE_STATUS_ENABLED: 'chat.responseStatusEnabled',
   /** รอเกินกี่นาที = แดง (1–1440) · ค่าเริ่มต้น `CHAT_RESPONSE_OVERDUE_DEFAULT_MINUTES` (5) */
@@ -231,9 +243,17 @@ export const AUDIT_LOG_RETENTION_MAX_DAYS = 3650;
 /** ค่าเริ่มต้นของ `general.pageLoadingScreen` — API (ยังไม่รัน `0010` / อ่านไม่ได้) และเว็บ (API รุ่นเก่าไม่ส่ง `uiPreferences`) ใช้ตัวเดียวกัน */
 export const PAGE_LOADING_SCREEN_DEFAULT = true;
 
-/** การแสดงผลของ CMS ที่ผู้ใช้ทุกคนได้จาก `GET /auth/me` (ไม่ต้องมีสิทธิ์เมนูตั้งค่า) — SV-ADR-055 */
+/**
+ * ค่าเริ่มต้นของ `general.toastDurationMs` (มิลลิวินาที · SV-ADR-134) — API (ยังไม่รัน `0047` / ค่าเพี้ยน) และเว็บ (API รุ่นเก่าไม่ส่ง `toastDurationMs`) ใช้ตัวเดียวกัน ·
+ * ช่วงที่รับ = `SETTING_NUMBER_BOUNDS[general.toastDurationMs]` (300–30,000 · Q-131)
+ */
+export const TOAST_DURATION_DEFAULT_MS = 500;
+
+/** การแสดงผลของ CMS ที่ผู้ใช้ทุกคนได้จาก `GET /auth/me` (ไม่ต้องมีสิทธิ์เมนูตั้งค่า) — SV-ADR-055 · SV-ADR-134 */
 export interface UiPreferences {
   pageLoadingScreen: boolean;
+  /** เวลาแสดง toast success/info (มิลลิวินาที · บีบเข้าช่วงแล้ว) — `general.toastDurationMs` · API รุ่นเก่าไม่ส่ง = `TOAST_DURATION_DEFAULT_MS` */
+  toastDurationMs?: number;
 }
 
 /**
@@ -284,12 +304,16 @@ export const SETTING_NUMBER_BOUNDS: Readonly<Record<string, { min: number; max: 
   [SettingKey.ORDER_NO_DIGITS]: { min: 1, max: 12 },
   // SV-CR-005 ข้อ 3.2 — เลขที่รายการบริจาคใช้ช่วงเดียวกับเลขที่ออเดอร์
   [SettingKey.DONATION_NO_DIGITS]: { min: 1, max: 12 },
+  // SV-ADR-137 — รหัสกองทุนอัตโนมัติ ช่วงเดียวกับเลขลำดับอื่น (คำนำหน้า 10 + 12 หลัก = 22 ≤ `FUNDRAISING_CODE_MAX_LENGTH` 30 — spec ล็อกไว้)
+  [SettingKey.FUNDRAISING_FUND_CODE_DIGITS]: { min: 1, max: 12 },
   // SV-ADR-051 — สติ๊กเกอร์ฉลากยา/พัสดุที่เครื่องพิมพ์ความร้อนทั่วไปรองรับ 20–200 mm · ขอบในไม่เกิน 10 mm (ดวง 50 mm ยังมีที่พิมพ์)
   [SettingKey.ORDER_LABEL_WIDTH_MM]: { min: 20, max: 200 },
   [SettingKey.ORDER_LABEL_HEIGHT_MM]: { min: 20, max: 200 },
   [SettingKey.ORDER_LABEL_MARGIN_MM]: { min: 0, max: 10 },
   // SV-ADR-115 — 1 นาทีถึง 1 วัน (เกินวันแสดงเป็นวันอยู่แล้ว)
   [SettingKey.CHAT_RESPONSE_OVERDUE_MINUTES]: { min: 1, max: 1440 },
+  // SV-ADR-134 · Q-131 — ต่ำกว่า 0.3 วินาทีกล่องหายก่อนจบ animation เข้า (อ่านไม่ได้แน่นอน) · เกิน 30 วินาทีเท่ากับค้างจอ (ให้ใช้ปุ่มปิดแทน)
+  [SettingKey.GENERAL_TOAST_DURATION_MS]: { min: 300, max: 30_000 },
 };
 
 /**
@@ -347,6 +371,8 @@ export const SETTING_STRING_RULES: Readonly<Record<string, SettingStringRule>> =
   [SettingKey.SOUVENIR_CODE_PREFIX]: { required: false, maxChars: 10, pattern: /^[A-Za-z0-9_-]*$/ },
   [SettingKey.ORDER_NO_PREFIX]: { required: false, maxChars: 10, pattern: /^[A-Za-z0-9_-]*$/ },
   [SettingKey.DONATION_NO_PREFIX]: { required: false, maxChars: 10, pattern: /^[A-Za-z0-9_-]*$/ },
+  // SV-ADR-137 — รหัสกองทุนต้องผ่าน `FUNDRAISING_CODE_PATTERN` (ขึ้นต้นด้วยตัวอักษร/ตัวเลข) → คำนำหน้าห้ามขึ้นต้นด้วย - หรือ _ · ว่างได้ (รหัส = เลขล้วน)
+  [SettingKey.FUNDRAISING_FUND_CODE_PREFIX]: { required: false, maxChars: 10, pattern: /^(?:[A-Za-z0-9][A-Za-z0-9_-]*)?$/ },
   // บรรทัดผู้ส่งบนใบแปะหน้า (SV-ADR-051) — ว่างได้ทุกช่อง (ชื่อว่าง = ใช้ชื่อระบบ) · บรรทัดเดียว (ดวงเล็ก พิมพ์ที่อยู่ผู้ส่งต่อกันบรรทัดเดียว)
   [SettingKey.ORDER_LABEL_SENDER_NAME]: { required: false, maxChars: 100 },
   [SettingKey.ORDER_LABEL_SENDER_PHONE]: { required: false, maxChars: 30 },
@@ -447,6 +473,15 @@ export function clampSettingNumber(key: string, value: number, fallback: number)
   if (!Number.isFinite(value)) return fallback;
   if (!bounds) return value;
   return Math.min(Math.max(value, bounds.min), bounds.max);
+}
+
+/**
+ * เวลาแสดง toast ที่ใช้ได้จริง (SV-ADR-134) — ไม่ใช่ตัวเลข/ไม่จำกัด = `TOAST_DURATION_DEFAULT_MS` · นอกช่วง (แถวที่แก้ตรง DB) = บีบเข้าช่วง · ปัดเป็นจำนวนเต็ม ·
+ * API (`getUiPreferences`) และเว็บ (`setToastDefaultDuration` · ค่าจาก API รุ่นใดก็ได้) ใช้ตัวเดียวกัน
+ */
+export function normalizeToastDurationMs(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return TOAST_DURATION_DEFAULT_MS;
+  return Math.round(clampSettingNumber(SettingKey.GENERAL_TOAST_DURATION_MS, value, TOAST_DURATION_DEFAULT_MS));
 }
 
 /** key ของ LINE ต่อ channel — เช่น lineSettingKey('MAIN', 'channelSecret') → 'line.main.channelSecret' */

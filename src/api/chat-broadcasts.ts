@@ -4,7 +4,8 @@ import { CHAT_MESSAGE_MAX_LENGTH, type ChatUserRef } from './chat';
 import type { DonorGroupRef } from './donor-groups';
 
 // ── Broadcast จากหน้า Chat (`SV-CR-017` §3 · FT-10 `REQ-CHT-028` · SV-ADR-130 · `T-181`) ─────────────────────────────
-// ส่ง = `chat` FULL · ดูประวัติ = `chat` READ_ONLY · ข้อความอย่างเดียว · **ไม่ลงห้องแชท** (ไม่แตะ chat_threads/chat_messages)
+// ส่ง = `chat` FULL · ดูประวัติ = `chat` READ_ONLY · ข้อความอย่างเดียว · ส่งสำเร็จ (SENT/PARTIAL) = ลงห้องแชทของผู้รับเป็นข้อความขาออก
+// (`0048` · `REQ-CHT-030` · SV-ADR-135 — เดิม SV-ADR-130 "ไม่ลงห้องแชท") แต่**ไม่แตะ chat_threads** (ลำดับห้อง/ยังไม่อ่าน/สถานะรอตอบคงเดิม)
 
 /** เป้าหมาย — ALL = LINE broadcast (ผู้ติดตาม OA ทุกคน) · DONOR_GROUPS = multicast ผู้บริจาคที่ผูก LINE ในกลุ่มที่เลือก */
 export const ChatBroadcastTargetType = {

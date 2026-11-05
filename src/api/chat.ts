@@ -1,6 +1,7 @@
 import { ChatMessageType, type ChatMessageDirection } from '../enums/chat';
 import type { LineChannel } from '../enums/line';
 import type { ChatAppearance, ChatFlag } from './chat-settings';
+import type { ChatBroadcastTargetType } from './chat-broadcasts';
 
 /** รายการคู่สนทนาที่ CMS เห็น — ข้อมูลตัวตนมาจาก LINE account เท่านั้น (`REQ-CHT-001`) */
 export interface ChatThreadListItemView {
@@ -186,6 +187,17 @@ export interface ChatMessageView {
   sentAt: string;
   /** ข้อความขาออกจาก CMS = แอดมินผู้ส่ง · ขาเข้า / ไม่ทราบ (บัญชีถูกลบถาวร) = `null` */
   sentBy: ChatMessageSender | null;
+  /**
+   * ข้อความที่ระบบลงห้องให้หลัง Broadcast สำเร็จ (`REQ-CHT-030` · SV-ADR-135 · `chat_messages.broadcast_id`) — ขาออกเสมอ ·
+   * ข้อความปกติ = `null` · `targetType` ใช้แสดงป้าย "Broadcast · ทุกคน / ตามกลุ่ม"
+   */
+  broadcast: ChatMessageBroadcastRef | null;
+}
+
+/** Broadcast ต้นทางของข้อความในห้อง — id ของ `chat_broadcasts` + เป้าหมาย (ประวัติเต็มดูที่ `GET /chat/broadcasts`) */
+export interface ChatMessageBroadcastRef {
+  id: string;
+  targetType: ChatBroadcastTargetType;
 }
 
 export interface ChatThreadView extends ChatThreadListItemView {
@@ -241,6 +253,11 @@ export const ChatStreamEventName = {
   THREAD: 'thread',
   /** API กำลังปิดสาย — `data.reason` บอกว่าควรต่อใหม่แบบไหน */
   CLOSE: 'close',
+  /**
+   * Broadcast ลงห้องแชทแล้ว (`REQ-CHT-030` · SV-ADR-135) — **1 event ต่อ broadcast** (ไม่ยิงทีละห้อง) · ไม่มีข้อมูลห้อง/ยอดยังไม่อ่าน
+   * (chat_threads ไม่เปลี่ยน) → หน้าที่เปิดห้องของ channel นั้นอยู่ดึงข้อความล่าสุดของห้องนั้นเอง
+   */
+  BROADCAST: 'broadcast',
 } as const;
 export type ChatStreamEventName = (typeof ChatStreamEventName)[keyof typeof ChatStreamEventName];
 
@@ -252,8 +269,12 @@ export const ChatEventKind = {
   READ: 'READ',
   /** แอดมินเปลี่ยนสถานะห้อง — รับทราบ · แฟล็ก · ผู้ดูแล (`SV-CR-015`) */
   UPDATED: 'UPDATED',
+  /** Broadcast ลงห้องแชทแล้ว (`0048` · `chat_events.thread_id` = NULL · `broadcast_id`) — ส่งเป็น SSE `broadcast` ไม่ใช่ `thread` */
+  BROADCAST: 'BROADCAST',
 } as const;
 export type ChatEventKind = (typeof ChatEventKind)[keyof typeof ChatEventKind];
+/** ชนิดที่ผูกกับห้องเดียว (SSE `thread`) */
+export type ChatThreadEventKind = Exclude<ChatEventKind, typeof ChatEventKind.BROADCAST>;
 
 export interface ChatStreamReadyData {
   serverTime: string;
@@ -266,11 +287,20 @@ export interface ChatStreamReadyData {
 export interface ChatStreamThreadData {
   /** id ของแถว `chat_events` (`memory` = `null`) — ใช้กันการส่งซ้ำ */
   eventId: string | null;
-  kind: ChatEventKind;
+  kind: ChatThreadEventKind;
   thread: ChatThreadListItemView;
   /** มีเมื่อ `kind = MESSAGE` และข้อความยังอยู่ */
   message: ChatMessageView | null;
   unread: ChatUnreadSummary;
+  at: string;
+}
+
+/** SSE `broadcast` — Broadcast `broadcast.id` ลงห้องของ `broadcast.channel` แล้ว (ALL = ทุกห้อง · DONOR_GROUPS = เฉพาะห้องของผู้รับที่ LINE รับ) */
+export interface ChatStreamBroadcastData {
+  /** id ของแถว `chat_events` (`memory` = `null`) */
+  eventId: string | null;
+  kind: typeof ChatEventKind.BROADCAST;
+  broadcast: ChatMessageBroadcastRef & { channel: LineChannel };
   at: string;
 }
 

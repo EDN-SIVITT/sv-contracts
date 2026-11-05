@@ -7,6 +7,7 @@ import type { CampaignSouvenirRuleMode, CampaignStockPolicy } from './fundraisin
  *
  * - `GET /programs|funds|campaigns` (list · ค้นหา/ตัวกรอง/เรียง/หน้า) · `GET /:id` (view + ยอด) · `POST` · `PATCH /:id` (เปิด/ปิดใช้งาน = `isActive`) · `DELETE /:id` (soft)
  * - `GET /<เมนู>/history` · `GET /<เมนู>/:id/history` — ประวัติการแก้ไข (`RecordHistoryResponse` · `history.ts`)
+ * - ไอคอนกองทุน/แคมเปญ (`T-188` · SV-ADR-136): `POST|DELETE /funds|campaigns/:id/icon` (MAINTAIN) · `GET …/:id/icon?v=` (READ_ONLY) · `GET …/:id/icon/public` (@Public · เปิดรับเท่านั้น) — ดูหัวข้อ "ไอคอน" ท้ายไฟล์
  * - `GET /programs/options` — **ทุกคนที่ login** · ต้นไม้ โปรแกรม → กองทุน → แคมเปญ (ตัวเลือกของฟอร์มรายการบริจาค · ตัวกรอง) · `?all=1` รวมที่ปิดใช้งาน
  * - ลบแม่ที่มีลูก/รายการบริจาคอ้าง (นับเฉพาะที่ยังไม่ลบ) → 409 `PROGRAM_IN_USE` / `FUND_IN_USE` / `CAMPAIGN_IN_USE` — ให้ปิดใช้งานแทน
  * - ปิดใช้งานไม่ cascade — ตัวเลือกใหม่ต้องเปิดทั้งสาย (แคมเปญ + กองทุน + โปรแกรม) · ของเดิมที่ผูกไว้แสดงต่อ
@@ -144,6 +145,8 @@ export interface FundListItemView extends FundraisingListItemBase {
   program: FundraisingRef | null;
   /** จำนวนแคมเปญ (ที่ยังไม่ลบ) */
   campaignCount: number;
+  /** ไอคอนที่อัปโหลด (`fundIconUrl` · PNG 256×256) · `null` = ไม่มี (หน้าเว็บแสดงไอคอนพื้นฐานของเมนู) — `T-188` */
+  iconUrl: string | null;
 }
 
 /** แคมเปญ 1 แถวในหน้า view ของกองทุน (ที่ยังไม่ลบ · เรียงชื่อ) + ยอดของแคมเปญนั้น */
@@ -153,6 +156,8 @@ export interface FundCampaignItem extends FundraisingRef {
   endDate: string | null;
   targetAmount: string | null;
   stats: FundraisingStats;
+  /** ไอคอนของแคมเปญ (`campaignIconUrl`) · `null` = ไม่มี — `T-188` */
+  iconUrl: string | null;
 }
 
 /** `GET /funds/:id` */
@@ -167,6 +172,49 @@ export interface FundInput extends ProgramInput {
    * ชั้นโปรแกรม**เปิด**: สร้างต้องส่ง (ไม่ส่ง → 422 `FUND_PROGRAM_REQUIRED`) · แก้ไข `null` = ล้างโปรแกรม · ชั้นโปรแกรม**ปิด**: ช่องนี้ถูกเมิน (สร้าง = ไม่มีโปรแกรม · แก้ = คงเดิม) — SV-ADR-090
    */
   programId?: string | null;
+}
+
+// ── รหัสกองทุนอัตโนมัติ + ตรวจรหัสซ้ำ (`SV-CR-018` §4 · `T-189` · FT-18 `REQ-FND-020` · SV-ADR-137) ─────────────────
+
+/**
+ * รหัสอัตโนมัติ = `fundraising.fundCodePrefix` + เลขลำดับเติม 0 ให้ครบ `fundraising.fundCodeDigits` หลัก (`formatSequenceCode`) · เลขจาก `running_numbers('fund')` ·
+ * ค่าด้านล่างเป็นค่าสำรองเมื่อ DB ยังไม่มีแถว (ยังไม่รัน `0050`) / ค่าเพี้ยน — กฎของค่าตั้งค่าอยู่ที่ `SETTING_STRING_RULES` / `SETTING_NUMBER_BOUNDS` (`./settings.ts`)
+ * เฉพาะ**กองทุน** (โปรแกรม/แคมเปญยังกรอกเองตามเดิม · CR-018 §10)
+ */
+export const FUND_CODE_PREFIX_DEFAULT = 'FND';
+export const FUND_CODE_DIGITS_DEFAULT = 4;
+export const FUND_RUNNING_NUMBER_KEY = 'fund';
+
+/** body ของ `POST /funds` — `autoCode: true` = ระบบออกรหัสให้ใน transaction (ส่งคู่กับ `code` ที่ไม่ว่าง = 422 `VALIDATION_FAILED { field: 'code', reason: 'AUTO_CODE_WITH_CODE' }`) · ชน 10 ครั้ง = 409 `FUND_CODE_CONFLICT` */
+export interface FundCreateInput extends FundInput {
+  autoCode?: boolean;
+}
+
+/** ผลตรวจรหัสที่ใช้ไม่ได้ — `TAKEN` = กองทุนอื่น (ที่ยังไม่ลบ · ไม่สนตัวพิมพ์ ตาม unique `uq_funds_code_active`) ใช้อยู่ · `INVALID` = ว่าง/ยาวเกิน/ไม่ตรง `FUNDRAISING_CODE_PATTERN` */
+export const FundCodeCheckReason = {
+  TAKEN: 'TAKEN',
+  INVALID: 'INVALID',
+} as const;
+export type FundCodeCheckReason = (typeof FundCodeCheckReason)[keyof typeof FundCodeCheckReason];
+
+/** `GET /funds/code-check?code=&excludeId=` (funds READ_ONLY · ไม่มี audit) — `excludeId` = กองทุนที่กำลังแก้ (รหัสเดิมของตัวเอง = ใช้ได้) */
+export interface FundCodeCheckQuery {
+  code: string;
+  excludeId?: string;
+}
+
+export interface FundCodeCheckResponse {
+  available: boolean;
+  reason?: FundCodeCheckReason;
+  /** กองทุนที่ใช้รหัสนี้อยู่ (เฉพาะ `TAKEN`) */
+  takenBy?: { id: string; name: string };
+}
+
+/** `GET /funds/code-format` (funds MAINTAIN — ผู้กรอกฟอร์มอาจไม่มีสิทธิ์เมนูตั้งค่า) — `example` = รหัสถัดไปโดยประมาณ (เลขล่าสุด + 1 · ชนรหัสที่กรอกเองจะข้ามไปเลขถัดไป) */
+export interface FundCodeFormatResponse {
+  prefix: string;
+  digits: number;
+  example: string;
 }
 
 export interface FundListQuery extends FundraisingListQuery {
@@ -191,6 +239,8 @@ export interface CampaignListItemView extends FundraisingListItemBase {
   endDate: string | null;
   /** เป้ายอด DECIMAL(14,2) เป็นข้อความ (`"500000.00"`) · `null` = ไม่ตั้งเป้า */
   targetAmount: string | null;
+  /** ไอคอนที่อัปโหลด (`campaignIconUrl` · PNG 256×256) · `null` = ไม่มี (หน้าเว็บแสดงไอคอนพื้นฐานของเมนู) — `T-188` */
+  iconUrl: string | null;
 }
 
 /** `GET /campaigns/:id` */
@@ -261,4 +311,47 @@ export interface FundraisingOptionsResponse {
    * ตัวเลือกปกติ (ไม่ใช่ `all`) **ไม่ตัดกองทุนของโปรแกรมที่ปิด** (สถานะโปรแกรมไม่มีผลเมื่อปิดชั้น)
    */
   programEnabled: boolean;
+}
+
+// ── ไอคอนกองทุน/แคมเปญ (`SV-CR-018` §3 · FT-18 `REQ-FND-019` · SV-ADR-136 · `T-188`) ─────────────────────
+
+/**
+ * ย่อเป็นจัตุรัส 256×256 แบบ contain พื้นโปร่ง (PNG) ผ่าน sharp — ตัวย่อเดียวกับไอคอนช่องทางติดต่อ (คนละขนาด · ไอคอนช่องทาง/กลุ่มยัง 128) ·
+ * **ไม่รับ SVG** (ตรวจชนิดจากเนื้อไฟล์ ไม่เชื่อ MIME ที่ประกาศ) · ไม่มีไอคอนของโปรแกรม (ผู้บริจาคไม่เห็นชั้นโปรแกรม)
+ */
+export const FUNDRAISING_ICON_PX = 256;
+/** ขนาดที่แนะนำให้ผู้ใช้เตรียม (คำแนะนำในฟอร์ม — คมบนจอ 2–3x ของหน้า LINE OA) */
+export const FUNDRAISING_ICON_RECOMMENDED_PX = 512;
+export const FUNDRAISING_ICON_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
+/** ขนาดไฟล์สูงสุด — เกิน = 413 `FILE_TOO_LARGE { maxMb }` (และไม่เกิน `s3.maxUploadSizeMb` ของเมนูตั้งค่า) */
+export const FUNDRAISING_ICON_MAX_BYTES = 1024 * 1024;
+/** ขนาดภาพต้นฉบับต่อด้านที่รับ — นอกช่วง = 422 `IMAGE_DIMENSIONS_INVALID` (เท่าไอคอนช่องทางติดต่อ) */
+export const FUNDRAISING_ICON_SOURCE_MIN_PX = 16;
+export const FUNDRAISING_ICON_SOURCE_MAX_PX = 8000;
+/** `icon_version` = hex 8 ตัว สุ่มใหม่ทุกครั้งที่อัปโหลด → URL `?v=` เปลี่ยน */
+export const FUNDRAISING_ICON_VERSION_LENGTH = 8;
+
+/** entity ที่ประทับลง audit (`@Audit({ entity })`) — subject = `funds` / `campaigns` · before/after = สรุป (ไม่มี object key) */
+export const FundraisingIconAuditEntity = {
+  FUND_ICON: 'fund_icon',
+  CAMPAIGN_ICON: 'campaign_icon',
+} as const;
+export type FundraisingIconAuditEntity = (typeof FundraisingIconAuditEntity)[keyof typeof FundraisingIconAuditEntity];
+
+/**
+ * path ของ route proxy บน origin ของเว็บ (`sv-web/src/app/fund-icon/[file]/route.ts` · `campaign-icon/[file]`) — `[file]` = id ·
+ * มี cookie → `GET /funds|campaigns/:id/icon?v=` (login + READ_ONLY ของเมนู · เห็นแถวที่ปิด) · ไม่มี cookie / 401 / 403 → `GET …/:id/icon/public`
+ * (เฉพาะกองทุน/แคมเปญที่เปิดรับ — เกณฑ์ `OPEN_FUNDS` / `OPEN_CAMPAIGNS` ไม่กรองวันที่ · `<img>` ของหน้า LINE OA)
+ */
+export const FUND_ICON_PATH = '/fund-icon/';
+export const CAMPAIGN_ICON_PATH = '/campaign-icon/';
+
+/** URL ไอคอนกองทุนบน origin ของเว็บ (`<img src>` ทั้ง CMS และหน้า LIFF) */
+export function fundIconUrl(id: string, version: string): string {
+  return `${FUND_ICON_PATH}${encodeURIComponent(id)}?v=${encodeURIComponent(version)}`;
+}
+
+/** URL ไอคอนแคมเปญบน origin ของเว็บ (`<img src>` ทั้ง CMS และหน้า LIFF — หน้าเลือกแคมเปญ `T-192`) */
+export function campaignIconUrl(id: string, version: string): string {
+  return `${CAMPAIGN_ICON_PATH}${encodeURIComponent(id)}?v=${encodeURIComponent(version)}`;
 }

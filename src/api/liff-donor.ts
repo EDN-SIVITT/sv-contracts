@@ -51,6 +51,10 @@ export interface LiffCampaignOption {
   description: string | null;
   startDate: string | null;
   endDate: string | null;
+  /** ไอคอนที่อัปโหลด (`campaignIconUrl` — public เฉพาะที่เปิดรับ) · `null` = ไม่มี (หน้ารายการใช้ไอคอนกองทุน → ไอคอนพื้นฐาน) — `T-192` */
+  iconUrl: string | null;
+  /** ป้าย "มีของที่ระลึก" (`T-192` · SV-ADR-140) = โหมดของที่ระลึกไม่ใช่ `NONE` + มีกฎที่มีผลวันนี้ของของ `ACTIVE` ไม่ลบ ≥ 1 (ไม่ดูสต็อก) */
+  hasSouvenirs: boolean;
 }
 
 /** กองทุนที่เปิดรับ (active ตลอดสาย) · `campaigns` ว่าง = บริจาคเข้ากองทุนโดยไม่ระบุแคมเปญ · `program` = `null` เมื่อไม่มีโปรแกรมหรือชั้นโปรแกรมปิด */
@@ -58,6 +62,8 @@ export interface LiffFundOption {
   id: string;
   name: string;
   description: string | null;
+  /** ไอคอนที่อัปโหลด (`fundIconUrl`) · `null` = ไม่มี — `T-192` */
+  iconUrl: string | null;
   program: { id: string; name: string } | null;
   campaigns: LiffCampaignOption[];
 }

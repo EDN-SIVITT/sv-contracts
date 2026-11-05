@@ -1,4 +1,4 @@
-import type { SouvenirEligibilityMeta } from './fundraising-souvenirs';
+import type { SouvenirCampaignsSummary, SouvenirEligibilityMeta } from './fundraising-souvenirs';
 import type { ApiMeta } from './response';
 import { formatSequenceCode } from './sequence-code';
 
@@ -179,13 +179,18 @@ export interface SouvenirListQuery {
   stock?: StockFilter;
   /** `SHORT` = เฉพาะที่ขาดตามที่จัดสรร (`shortage` > 0 · SV-ADR-098) — ใช้ร่วมกับตัวกรอง/เรียง/หน้าอื่นได้ */
   allocation?: SouvenirAllocationFilter;
+  /**
+   * แคมเปญที่เกี่ยวข้อง (`T-191` · SV-ADR-139) — id = ของที่มีกฎในแคมเปญนั้น (แคมเปญไม่ลบ · โหมด `CUSTOM`) ·
+   * `SOUVENIR_CAMPAIGN_FILTER_NONE` (`none`) = ไม่อยู่ในแคมเปญที่เกี่ยวข้องใดเลย · ใช้ร่วมกับตัวกรอง/เรียง/หน้าอื่นได้
+   */
+  campaignId?: string;
   sort?: SouvenirSort;
   page?: number;
   perPage?: number;
   /**
    * บริบทของ picker ในฟอร์มรายการบริจาค (`T-132` · SV-ADR-091) — ส่งอย่างน้อย 1 ช่อง = กรองตามเงื่อนไขของที่ระลึก + `meta.eligibility` ·
-   * ไม่ส่งทั้ง 3 = เดิมทุกอย่าง · `eligibleCampaignId` = ใช้กองทุนจริงของแคมเปญ · `eligibleDate` `YYYY-MM-DD` ไม่ส่ง = วันนี้ (เวลาไทย) ·
-   * `RULES` = เฉพาะของในกฎที่มีผลวันนั้น (+ `eligibleThreshold`) · `NONE` = รายการว่าง · `LEGACY` = เดิม
+   * ไม่ส่งทั้ง 3 = เดิมทุกอย่าง · กฎมาจาก `eligibleCampaignId` เท่านั้น (`T-190` — `eligibleFundId` ไม่มีผลกับกฎแล้ว · ไม่มีแคมเปญ = `LEGACY`) ·
+   * `eligibleDate` `YYYY-MM-DD` ไม่ส่ง = วันนี้ (เวลาไทย) · `RULES` = เฉพาะของในกฎของแคมเปญที่มีผลวันนั้น (+ `eligibleThreshold`) · `NONE` = รายการว่าง · `LEGACY` = เดิม
    */
   eligibleFundId?: string;
   eligibleCampaignId?: string;
@@ -238,10 +243,15 @@ export interface SouvenirListItemView {
    * = `overAllocated` ของ `GET /souvenirs/:id/allocations` · 0 = ไม่ขาด
    */
   shortage: number;
+  /** แคมเปญที่เกี่ยวข้อง (`T-191` · SV-ADR-139) — query รวมครั้งเดียวต่อหน้า · ไม่อยู่ในแคมเปญใด = `{ total: 0, items: [], otherNames: [] }` */
+  campaigns: SouvenirCampaignsSummary;
 }
 
-/** ช่องของ list ที่คำนวณต่อหน้า (บริบท picker · ยอดจัดสรร) — หน้า view ไม่มี (ยอดจัดสรรของสินค้าอยู่ที่ `GET /souvenirs/:id/allocations`) */
-type SouvenirListOnlyField = 'eligibleThreshold' | 'campaignAvailable' | 'allocatedRemaining' | 'shortage';
+/**
+ * ช่องของ list ที่คำนวณต่อหน้า (บริบท picker · ยอดจัดสรร · แคมเปญที่เกี่ยวข้อง) — หน้า view ไม่มี
+ * (ยอดจัดสรรของสินค้าอยู่ที่ `GET /souvenirs/:id/allocations` · แคมเปญที่ `GET /souvenirs/:id/campaigns`)
+ */
+type SouvenirListOnlyField = 'eligibleThreshold' | 'campaignAvailable' | 'allocatedRemaining' | 'shortage' | 'campaigns';
 
 /** หน้า view (`GET /souvenirs/:id`) — ไม่มีบริบทของ picker (`eligibleThreshold` / `campaignAvailable` อยู่เฉพาะ list) · ยอดจัดสรรดู `GET /souvenirs/:id/allocations` */
 export interface SouvenirView extends Omit<SouvenirListItemView, SouvenirListOnlyField> {

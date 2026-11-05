@@ -168,6 +168,8 @@ export const ErrorCode = {
   FUND_NAME_TAKEN: 'FUND_NAME_TAKEN',
   /** รหัสกองทุนซ้ำ (ทั้งระบบ) */
   FUND_CODE_TAKEN: 'FUND_CODE_TAKEN',
+  /** ออกรหัสกองทุนอัตโนมัติ (`autoCode`) แล้วชนรหัสที่กรอกเองติดกัน 10 ครั้ง — 409 `details { attempts }` · เลขลำดับไม่ถูกใช้ (rollback) · `T-189` · SV-ADR-137 */
+  FUND_CODE_CONFLICT: 'FUND_CODE_CONFLICT',
   /** ลบกองทุนที่ยังมีแคมเปญหรือรายการบริจาค (ที่ยังไม่ลบ) อ้าง — 409 `details { campaignCount, donationCount }` · ให้ปิดใช้งานแทน */
   FUND_IN_USE: 'FUND_IN_USE',
   /** `programId` ไม่มีอยู่หรือถูกลบ (ปิดใช้งานเลือกได้) — 422 `details { field: 'programId' }` */
@@ -226,9 +228,9 @@ export const ErrorCode = {
    */
   DONATION_CAMPAIGN_FUND_MISMATCH: 'DONATION_CAMPAIGN_FUND_MISMATCH',
   /**
-   * ของที่ระลึกไม่อยู่ในเงื่อนไขของกองทุน/แคมเปญ ณ วันที่บริจาค (`SV-CR-008` · `T-132` · SV-ADR-091) หรือแคมเปญตั้ง "ไม่แจกของ" —
-   * 422 `details { souvenirId, code, name, mode, source }` (`mode` = `SouvenirEligibilityMode` `RULES`/`NONE` · `source` = `SouvenirRuleSource`) ·
-   * แถวเดิมจำนวนไม่เพิ่มในบริบทเดิมเก็บได้ · เปลี่ยนกองทุน/แคมเปญ/วันที่ = ตรวจของเดิมใหม่ทั้งชุด
+   * ของที่ระลึกไม่อยู่ในเงื่อนไขของแคมเปญ ณ วันที่บริจาค (`SV-CR-008` · `T-132` · SV-ADR-091 · แคมเปญเท่านั้น `T-190`) หรือแคมเปญตั้ง "ไม่แจกของ" —
+   * 422 `details { souvenirId, code, name, mode }` (`mode` = `SouvenirEligibilityMode` `RULES`/`NONE`) ·
+   * แถวเดิมจำนวนไม่เพิ่มในบริบทเดิมเก็บได้ · เปลี่ยนแคมเปญ/วันที่ = ตรวจของเดิมใหม่ทั้งชุด
    */
   DONATION_SOUVENIR_NOT_ELIGIBLE: 'DONATION_SOUVENIR_NOT_ELIGIBLE',
   // ── จัดสรรสต็อกให้แคมเปญ (`SV-CR-008` ข้อ 2 · `T-133` · SV-ADR-092) ──

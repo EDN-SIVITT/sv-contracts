@@ -5,22 +5,21 @@ import type { SouvenirStatus } from './souvenirs';
  * ของที่ระลึก × กองทุน/แคมเปญ (`SV-CR-008`) — เงื่อนไขของที่ระลึก (`T-132` · SV-ADR-091) + จัดสรรสต็อกให้แคมเปญ (`T-133` · SV-ADR-092)
  * schema: `sv-api/migrations/0031_campaign_souvenir_stock.sql` · ใช้ของที่ระลึก/สต็อก/lot/ออเดอร์**เดิม** · ไม่เพิ่ม permission subject
  *
- * - `GET|PUT /funds/:id/souvenir-rules` (funds READ_ONLY / MAINTAIN · audit `fund_souvenir_rule` `{ rules }`) — `PUT` = แทนทั้งชุด
- * - `GET|PUT /campaigns/:id/souvenir-rules` (campaigns READ_ONLY / MAINTAIN · audit `campaign_souvenir_rule` `{ mode, rules }`)
+ * - `GET|PUT /campaigns/:id/souvenir-rules` (campaigns READ_ONLY / MAINTAIN · audit `campaign_souvenir_rule` `{ mode, rules }`) — `PUT` = แทนทั้งชุด
  * - `GET /souvenirs?eligibleFundId=&eligibleCampaignId=&eligibleDate=` — picker ของรายการบริจาค (ไม่ส่งทั้ง 3 = เดิม)
  * - กฎ = **รายชื่อของที่เลือกได้ + เกณฑ์ยอดบริจาค/ชิ้นที่ใช้แทน `souvenirs.donation_threshold`** → snapshot `unit_donation_threshold` + งบเดิม (Σ qty × เกณฑ์ ≤ ยอด)
- * - ไม่มีกฎ + ไม่มีจัดสรร = พฤติกรรมเดิมทุกอย่าง (`LEGACY`)
+ * - **ของที่ระลึกกำหนดที่แคมเปญเท่านั้น** (`T-190` · SV-ADR-138): เลิกใช้กฎของกองทุน (`GET|PUT /funds/:id/souvenir-rules` ถูกลบ · แถว `fund_id` เดิมเก็บไว้ในตารางแต่ไม่ถูกอ่าน) ·
+ *   ไม่มีแคมเปญ (บริจาคเข้ากองทุนตรง/ทั่วไป) = พฤติกรรมเดิมทุกอย่าง (`LEGACY`)
  */
 
-/** กฎต่อเจ้าของ (กองทุน 1 ตัว หรือแคมเปญ 1 ตัว) ไม่เกินนี้ — เกิน → 400 (DTO แบบ `items` ของรายการบริจาค · service ตรวจซ้ำ 422 `{ field: 'rules', reason: 'TOO_MANY', max }`) */
+/** กฎต่อแคมเปญ 1 ตัวไม่เกินนี้ — เกิน → 400 (DTO แบบ `items` ของรายการบริจาค · service ตรวจซ้ำ 422 `{ field: 'rules', reason: 'TOO_MANY', max }`) */
 export const SOUVENIR_RULES_MAX = 50;
 
 /**
- * โหมดของที่ระลึกของแคมเปญ (`campaigns.souvenir_rule_mode`) — `FUND` (ค่าเริ่มต้น) ใช้กฎของกองทุนแม่ · `CUSTOM` ใช้กฎของแคมเปญเอง · `NONE` ไม่แจกของ
- * กฎของแคมเปญเก็บไว้แม้สลับโหมด (สลับกลับไม่หาย)
+ * โหมดของที่ระลึกของแคมเปญ (`campaigns.souvenir_rule_mode`) — `CUSTOM` "แจกของที่ระลึก" (ค่าเริ่มต้น) ใช้กฎของแคมเปญ (ว่าง = ไม่มีของให้เลือก) · `NONE` "ไม่แจกของที่ระลึก"
+ * กฎของแคมเปญเก็บไว้แม้สลับโหมด (สลับกลับไม่หาย) · `FUND` (ใช้กฎกองทุนแม่) เลิกใช้แล้ว (`T-190` · `0051` ย้ายเป็น `CUSTOM`) — ค่าไม่รู้จักใน DB = `CUSTOM`
  */
 export const CampaignSouvenirRuleMode = {
-  FUND: 'FUND',
   CUSTOM: 'CUSTOM',
   NONE: 'NONE',
 } as const;
@@ -34,8 +33,9 @@ export const CampaignStockPolicy = {
 export type CampaignStockPolicy = (typeof CampaignStockPolicy)[keyof typeof CampaignStockPolicy];
 
 /**
- * ผลของการ resolve กฎ ณ บริบท (กองทุน · แคมเปญ · วันที่บริจาค):
- * `LEGACY` = ไม่มีกฎ/ไม่มีกองทุน → แบบเดิม (ทุกสินค้า ACTIVE · เกณฑ์ของสินค้า) · `RULES` = เฉพาะของในกฎที่มีผลวันนั้น · เกณฑ์ = `minAmount` · `NONE` = แคมเปญไม่แจกของ
+ * ผลของการ resolve กฎ ณ บริบท (แคมเปญ · วันที่บริจาค):
+ * `LEGACY` = ไม่มีแคมเปญ (บริจาคเข้ากองทุนตรง/ทั่วไป) → แบบเดิม (ทุกสินค้า ACTIVE · เกณฑ์ของสินค้า) ·
+ * `RULES` = แคมเปญแจกของ (`CUSTOM`) — เฉพาะของในกฎของแคมเปญที่มีผลวันนั้น · เกณฑ์ = `minAmount` (ว่าง = ไม่มีของให้เลือก) · `NONE` = แคมเปญไม่แจกของ
  */
 export const SouvenirEligibilityMode = {
   LEGACY: 'LEGACY',
@@ -43,13 +43,6 @@ export const SouvenirEligibilityMode = {
   NONE: 'NONE',
 } as const;
 export type SouvenirEligibilityMode = (typeof SouvenirEligibilityMode)[keyof typeof SouvenirEligibilityMode];
-
-/** กฎที่ใช้มาจากไหน — `FUND` กองทุน (แคมเปญโหมด FUND หรือไม่มีแคมเปญ) · `CAMPAIGN` แคมเปญ (CUSTOM · และ NONE) */
-export const SouvenirRuleSource = {
-  FUND: 'FUND',
-  CAMPAIGN: 'CAMPAIGN',
-} as const;
-export type SouvenirRuleSource = (typeof SouvenirRuleSource)[keyof typeof SouvenirRuleSource];
 
 /** ชนิดของ ledger จัดสรร (`campaign_stock_allocation_movements.type` · `T-133`) — `qty` มีเครื่องหมาย (`DECREASE`/`RELEASE` ติดลบ) */
 export const CampaignAllocationMovementType = {
@@ -62,7 +55,7 @@ export type CampaignAllocationMovementType = (typeof CampaignAllocationMovementT
 
 /** ชื่อ entity ที่ประทับลง audit (`@Audit({ entity })`) ของ `SV-CR-008` — subject = `funds` / `campaigns` ตามเมนูที่สั่ง */
 export const FundraisingSouvenirAuditEntity = {
-  /** `PUT /funds/:id/souvenir-rules` — UPDATE `{ rules }` */
+  /** เลิกใช้ (`T-190` · endpoint `PUT /funds/:id/souvenir-rules` ถูกลบ) — คงชื่อไว้อ้างแถว audit เดิม (subject `funds` · UPDATE `{ rules }`) */
   FUND_SOUVENIR_RULE: 'fund_souvenir_rule',
   /** `PUT /campaigns/:id/souvenir-rules` — UPDATE `{ mode, rules }` */
   CAMPAIGN_SOUVENIR_RULE: 'campaign_souvenir_rule',
@@ -102,27 +95,15 @@ export interface SouvenirRuleView {
   sortOrder: number;
 }
 
-/** body ของ `PUT /funds/:id/souvenir-rules` — แทนทั้งชุด · `[]` = ล้างกฎ (กองทุนกลับเป็น `LEGACY`) */
-export interface FundSouvenirRulesInput {
-  rules: SouvenirRuleInput[];
-}
-
-/** `GET|PUT /funds/:id/souvenir-rules` — กองทุนไม่พบ/ถูกลบ = 404 */
-export interface FundSouvenirRulesView {
-  fundId: string;
-  rules: SouvenirRuleView[];
-}
-
-/** body ของ `PUT /campaigns/:id/souvenir-rules` — `rules` ไม่ส่ง = คงกฎเดิมของแคมเปญ (กฎเก็บไว้แม้สลับโหมด) */
+/** body ของ `PUT /campaigns/:id/souvenir-rules` — `rules` ไม่ส่ง = คงกฎเดิมของแคมเปญ (กฎเก็บไว้แม้สลับโหมด) · `mode` นอก `CUSTOM`/`NONE` (รวม `FUND` เดิม) = 400 */
 export interface CampaignSouvenirRulesInput {
   mode: CampaignSouvenirRuleMode;
   rules?: SouvenirRuleInput[];
 }
 
-/** กฎที่มีผล ณ บริบทหนึ่ง (`resolve`) — `LEGACY` = `source: null` + `rules: []` · `NONE` = `source: CAMPAIGN` + `rules: []` */
+/** กฎที่มีผล ณ บริบทหนึ่ง (`resolve`) — `NONE` = `rules: []` · `RULES` = กฎของแคมเปญที่มีผลวันนั้น (ว่างได้) */
 export interface SouvenirEffectiveRulesView {
   mode: SouvenirEligibilityMode;
-  source: SouvenirRuleSource | null;
   rules: SouvenirRuleView[];
 }
 
@@ -130,11 +111,9 @@ export interface SouvenirEffectiveRulesView {
 export interface CampaignSouvenirRulesView {
   campaignId: string;
   mode: CampaignSouvenirRuleMode;
-  /** กฎของแคมเปญเอง (ใช้เมื่อ `CUSTOM` · เก็บไว้แม้โหมดอื่น) */
+  /** กฎของแคมเปญ (ใช้เมื่อ `CUSTOM` · เก็บไว้แม้ `NONE`) */
   rules: SouvenirRuleView[];
-  /** กฎของกองทุนแม่ (ค่าเริ่มต้นเมื่อ `FUND`) */
-  fundRules: SouvenirRuleView[];
-  /** ที่มีผล ณ วันนี้ (เวลาไทย) ตามโหมด — กองทุนไม่มีกฎ + `FUND` = `LEGACY` */
+  /** ที่มีผล ณ วันนี้ (เวลาไทย) ตามโหมด — `CUSTOM` = `RULES` · `NONE` = `NONE` */
   effective: SouvenirEffectiveRulesView;
 }
 
@@ -143,7 +122,6 @@ export interface CampaignSouvenirRulesView {
 /** meta เพิ่มของ `GET /souvenirs` เมื่อส่ง `eligibleFundId` / `eligibleCampaignId` / `eligibleDate` มาอย่างน้อย 1 ช่อง */
 export interface SouvenirEligibilityMeta {
   mode: SouvenirEligibilityMode;
-  source: SouvenirRuleSource | null;
   /** นโยบายสต็อกของแคมเปญ · ไม่มีแคมเปญ = `null` */
   stockPolicy: CampaignStockPolicy | null;
 }
@@ -269,12 +247,11 @@ export interface SouvenirAllocationCampaignView {
   remaining: number;
 }
 
-/** กองทุน/แคมเปญที่มีเงื่อนไขของที่ระลึกอ้างสินค้านี้ (`fundraising_souvenir_rules` · ไม่รวมกองทุน/แคมเปญที่ถูกลบ) */
+/** แคมเปญที่มีเงื่อนไขของที่ระลึกอ้างสินค้านี้ (`fundraising_souvenir_rules` ของแคมเปญ · ไม่รวมกองทุน/แคมเปญที่ถูกลบ · กฎของกองทุนเดิมไม่แสดง — `T-190`) */
 export interface SouvenirRuleUsageView {
-  source: SouvenirRuleSource;
+  /** กองทุนแม่ของแคมเปญ */
   fund: { id: string; name: string };
-  /** กฎของกองทุน = `null` */
-  campaign: { id: string; name: string } | null;
+  campaign: { id: string; name: string };
   minAmount: string;
   startDate: string | null;
   endDate: string | null;
@@ -295,4 +272,96 @@ export interface SouvenirAllocationSummaryView {
   /** เรียงรหัสแคมเปญ */
   allocations: SouvenirAllocationCampaignView[];
   ruleUsages: SouvenirRuleUsageView[];
+}
+
+// ── ของที่ระลึก ↔ แคมเปญที่เกี่ยวข้อง (`SV-CR-018` §6 · `T-191` · SV-ADR-139 · FT-15 `REQ-SVN-018`) ─────────────────────
+//
+// "แคมเปญที่เกี่ยวข้อง" ของสินค้า = แคมเปญที่**ไม่ลบ** (กองทุนแม่ไม่ลบ) · โหมด `CUSTOM` (ค่าไม่รู้จัก = `CUSTOM` · `NONE` ไม่นับ — กฎค้างไม่มีผล) ·
+// มีกฎของสินค้านั้น ≥ 1 แถว (เปิด/ปิดใช้งาน · หมดช่วงก็นับ แต่บอกสถานะ) · กฎของกองทุนเดิม (`fund_id`) ไม่นับ (`T-190`)
+
+/** ค่าพิเศษของตัวกรอง `GET /souvenirs?campaignId=` = ไม่อยู่ในแคมเปญที่เกี่ยวข้องใดเลย */
+export const SOUVENIR_CAMPAIGN_FILTER_NONE = 'none';
+/** แคมเปญที่ส่งมาในแถวของ list (`campaigns.items`) ไม่เกินนี้ — ที่เหลือนับใน `total` · ชื่อใน `otherNames` */
+export const SOUVENIR_LIST_CAMPAIGNS_PREVIEW = 2;
+/** ชื่อแคมเปญที่เหลือ (`campaigns.otherNames` — tooltip ของ "+N") ไม่เกินนี้ */
+export const SOUVENIR_LIST_CAMPAIGN_NAMES_MAX = 10;
+
+/**
+ * สถานะแคมเปญ ณ วันนี้ (เวลาไทย) — ลำดับตัดสิน: `INACTIVE` (แคมเปญ/กองทุนปิดใช้งาน หรือโปรแกรมแม่ถูกลบ/ปิดเมื่อชั้นโปรแกรมเปิด = เกณฑ์ `OPEN_CAMPAIGNS`) →
+ * `NOT_STARTED` (วันนี้ < วันเริ่ม) → `ENDED` (วันนี้ > วันสิ้นสุด) → `OPEN` (เปิดรับบริจาค)
+ */
+export const SouvenirCampaignStatus = {
+  OPEN: 'OPEN',
+  INACTIVE: 'INACTIVE',
+  NOT_STARTED: 'NOT_STARTED',
+  ENDED: 'ENDED',
+} as const;
+export type SouvenirCampaignStatus = (typeof SouvenirCampaignStatus)[keyof typeof SouvenirCampaignStatus];
+
+/** แคมเปญ 1 ตัวในแถวของ list (ชิป) */
+export interface SouvenirCampaignChip {
+  id: string;
+  code: string | null;
+  name: string;
+  isActive: boolean;
+  /** `status === OPEN` (เปิดรับบริจาควันนี้) */
+  open: boolean;
+  /** มีกฎของสินค้านี้ที่มีผลวันนี้ ≥ 1 แถว */
+  effectiveToday: boolean;
+}
+
+/** `SouvenirListItemView.campaigns` — query รวมครั้งเดียวต่อหน้า (ไม่ N+1) · items เรียง: เปิดรับ + มีผลวันนี้ก่อน แล้วชื่อ แล้ว id */
+export interface SouvenirCampaignsSummary {
+  /** จำนวนแคมเปญที่เกี่ยวข้องทั้งหมด (0 = ไม่อยู่ในแคมเปญใด) */
+  total: number;
+  /** ≤ `SOUVENIR_LIST_CAMPAIGNS_PREVIEW` */
+  items: SouvenirCampaignChip[];
+  /** ชื่อของแคมเปญที่เหลือ (ลำดับเดียวกัน) ≤ `SOUVENIR_LIST_CAMPAIGN_NAMES_MAX` — tooltip ของ "+N" */
+  otherNames: string[];
+}
+
+/** 1 ตัวเลือกของ `GET /souvenirs/campaign-options` (souvenirs READ_ONLY) = แคมเปญที่เกี่ยวข้องกับของ (ไม่ลบ) ≥ 1 ชิ้น · เรียงชื่อ แล้ว id */
+export interface SouvenirCampaignOption {
+  id: string;
+  code: string | null;
+  name: string;
+  isActive: boolean;
+  fundName: string;
+}
+
+/** กฎ 1 แถวของสินค้านี้ในแคมเปญ (เรียง `sort_order, id` ตามที่หน้าแคมเปญบันทึก) */
+export interface SouvenirCampaignRuleRef {
+  /** เกณฑ์ยอดบริจาค/ชิ้น `"1000.00"` */
+  minAmount: string;
+  /** `YYYY-MM-DD` · `null` = ไม่จำกัด */
+  startDate: string | null;
+  endDate: string | null;
+  effectiveToday: boolean;
+}
+
+/**
+ * 1 แคมเปญของ `GET /souvenirs/:id/campaigns` (souvenirs READ_ONLY · สินค้าไม่พบ/ถูกลบ = 404) — กฎของชิ้นนี้จัดกลุ่มตามแคมเปญ ·
+ * เรียงแบบ `SouvenirCampaignsSummary.items` (เปิดรับ + มีผลวันนี้ก่อน แล้วชื่อ)
+ */
+export interface SouvenirCampaignUsageView {
+  campaign: {
+    id: string;
+    code: string | null;
+    name: string;
+    /** `campaignIconUrl` · `null` = ไม่มีไอคอน */
+    iconUrl: string | null;
+    isActive: boolean;
+    open: boolean;
+    status: SouvenirCampaignStatus;
+    startDate: string | null;
+    endDate: string | null;
+    stockPolicy: CampaignStockPolicy;
+  };
+  fund: { id: string; name: string; isActive: boolean };
+  /** `null` = กองทุนไม่มีโปรแกรม หรือชั้นโปรแกรมปิด (`fundraising.programEnabled`) */
+  program: { id: string; name: string; isActive: boolean } | null;
+  /** ≥ 1 แถว */
+  rules: SouvenirCampaignRuleRef[];
+  /** โควตาจัดสรรของสินค้านี้ให้แคมเปญ — มีแถวจัดสรร หรือแคมเปญนโยบาย `ALLOCATED` · อื่น ๆ = `null` */
+  quota: { allocated: number; used: number; remaining: number } | null;
 }
