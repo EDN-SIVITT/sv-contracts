@@ -37,6 +37,13 @@ export interface ChatThreadListItemView {
   assignee: ChatUserRef | null;
   assignedAt: string | null;
   /**
+   * `SV-CR-019` §4 · SV-ADR-144 · `REQ-CHT-032` — เวลาล่าสุดที่ผู้บริจาค "เห็นห้อง" (`chat_threads.donor_seen_at`) แบบ**อนุมาน**:
+   * ส่งข้อความเข้ามา (เวลาของ webhook event) หรือใช้หน้า LINE OA ที่ยืนยันตัวตนแล้ว (throttle 60 วินาที) · ไม่ถอยหลัง · ยังไม่เคย = `null`
+   * เว็บแสดงป้าย "อ่านแล้ว" ที่ข้อความขาออกซึ่ง `sentAt ≤ donorSeenAt` — LINE ไม่มี read receipt ของข้อความที่ OA ส่ง
+   * (คนละเรื่องกับ mark-as-read ทิศ OA → ผู้ใช้ของ SV-ADR-128) · เปลี่ยนจากหน้า LINE OA = event `SEEN`
+   */
+  donorSeenAt: string | null;
+  /**
    * `SV-CR-017` §2 · SV-ADR-129 — ผู้บริจาค (ยังไม่ลบ) ที่ผูก LINE ของห้องนี้ · ยังไม่ผูก = `null`
    * join ตอนอ่าน (`donors.line_user_active` unique = 1:1) — ผูก/ยกเลิก/แก้ชื่อจากที่ไหนก็ได้ค่าล่าสุดเมื่อโหลดใหม่
    */
@@ -249,7 +256,7 @@ export const CHAT_STREAM_HEARTBEAT_SECONDS = 25;
 export const ChatStreamEventName = {
   /** ส่งครั้งแรกหลังต่อสำเร็จ — client ใช้เป็นสัญญาณให้ดึงส่วนที่พลาดระหว่างหลุด */
   READY: 'ready',
-  /** มีการเปลี่ยนแปลงของคู่สนทนา (ข้อความใหม่ · อ่านแล้ว · รับทราบ/แฟล็ก/ผู้ดูแล) */
+  /** มีการเปลี่ยนแปลงของคู่สนทนา (ข้อความใหม่ · อ่านแล้ว · รับทราบ/แฟล็ก/ผู้ดูแล · ผู้บริจาคเห็นห้อง `SEEN`) */
   THREAD: 'thread',
   /** API กำลังปิดสาย — `data.reason` บอกว่าควรต่อใหม่แบบไหน */
   CLOSE: 'close',
@@ -269,6 +276,11 @@ export const ChatEventKind = {
   READ: 'READ',
   /** แอดมินเปลี่ยนสถานะห้อง — รับทราบ · แฟล็ก · ผู้ดูแล (`SV-CR-015`) */
   UPDATED: 'UPDATED',
+  /**
+   * ผู้บริจาคใช้หน้า LINE OA (LIFF) หลังข้อความขาออกล่าสุด → `thread.donorSeenAt` ขยับ (`REQ-CHT-032` · SV-ADR-144) — ไม่มี `message` ·
+   * ไม่เรียงห้องใหม่/ไม่แทรกห้อง (เหมือน `READ`) · ข้อความขาเข้าจาก LINE ขยับค่าเดียวกันใน event `MESSAGE` ของข้อความนั้นอยู่แล้ว (ไม่ส่งตัวนี้ซ้ำ)
+   */
+  SEEN: 'SEEN',
   /** Broadcast ลงห้องแชทแล้ว (`0048` · `chat_events.thread_id` = NULL · `broadcast_id`) — ส่งเป็น SSE `broadcast` ไม่ใช่ `thread` */
   BROADCAST: 'BROADCAST',
 } as const;

@@ -84,7 +84,9 @@ export interface LiffDonateSouvenirsQuery {
 
 /**
  * ของที่ระลึกที่เลือกได้ในบริบทนี้ (กติกาเดียวกับฟอร์ม CMS — `resolveSouvenirEligibility`) · `minAmount` = เกณฑ์ต่อชิ้น (`"0.00"` = ไม่มีเกณฑ์) ·
- * งบ: Σ qty × minAmount ≤ ยอดบริจาค (`DONATION_SOUVENIR_OVER_AMOUNT`) · `maxQty` = เพดานจากของที่พร้อมส่งในบริบทนี้ (โควตาแคมเปญเมื่อ `ALLOCATED`) — 0 = หมด
+ * งบ: Σ qty × minAmount ≤ ยอดบริจาค (`DONATION_SOUVENIR_OVER_AMOUNT`) · `maxQty` = เพดานจากของที่พร้อมส่งในบริบทนี้ — 0 = หมด ·
+ * ชนิดสต็อกของ (แคมเปญ, ของ) (`T-194` · SV-ADR-143): `RESERVED` = max(0, ที่จองเหลือ − ร่าง − รอออกออเดอร์) **ไม่ตัดด้วยคงเหลือจริง** (pre-order เลือกได้ถึงโควตา) ·
+ * `CENTRAL`/ไม่มีแคมเปญ = แบบเดิม (≤ คงเหลือจริง) − รอออกออเดอร์ · รอออกออเดอร์ = Σ qty ของรายการบริจาค `PENDING`/`CONFIRMED` (ไม่ลบ) ในบริบทเดียวกัน
  */
 export interface LiffEligibleSouvenirView {
   id: string;
@@ -95,6 +97,8 @@ export interface LiffEligibleSouvenirView {
   minAmount: string;
   stockLevel: LiffStockLevel;
   maxQty: number;
+  /** ของจองของแคมเปญนี้ (`RESERVED`) ที่ยังไม่มีของจริงพอ (Σ ที่จองเหลือทุกแคมเปญ > คงเหลือจริง) → ป้าย "Pre-order · จัดส่งเมื่อของเข้า" (`T-196`) */
+  preorder: boolean;
 }
 
 /** `mode` = `NONE` → แคมเปญไม่แจกของ (ซ่อนส่วนของที่ระลึก) · เรียงตามกฎ (`sort_order`) แล้วชื่อ */
@@ -130,6 +134,8 @@ export interface LiffSouvenirOfferView {
   programName: string | null;
   minAmount: string;
   untilDate: string | null;
+  /** ของชิ้นนี้ในแคมเปญนี้เป็น pre-order (นิยามเดียวกับ `LiffEligibleSouvenirView.preorder`) */
+  preorder: boolean;
 }
 
 /** การ์ดในแคตตาล็อก — เฉพาะของ `ACTIVE` ที่ผูกด้วยกฎกับแคมเปญที่เปิดรับ (SV-ADR-104) · `minAmountFrom` = เกณฑ์ต่ำสุดของทุก offer */
@@ -141,6 +147,8 @@ export interface LiffSouvenirCardView {
   stockLevel: LiffStockLevel;
   minAmountFrom: string;
   offers: LiffSouvenirOfferView[];
+  /** offer ที่ให้ระดับพร้อมส่งดีที่สุดเป็น pre-order (`offers[].preorder`) */
+  preorder: boolean;
 }
 
 /** `campaigns` = แคมเปญที่มีของในแคตตาล็อกอย่างน้อย 1 ชิ้น (ชิปกรอง) · การ์ดเรียงชื่อ → id */

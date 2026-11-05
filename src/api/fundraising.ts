@@ -1,5 +1,5 @@
 import type { DonationActorView } from './donations';
-import type { CampaignSouvenirRuleMode, CampaignStockPolicy } from './fundraising-souvenirs';
+import type { CampaignSouvenirRuleMode } from './fundraising-souvenirs';
 
 /**
  * โครงสร้างการรับบริจาค โปรแกรม (ภารกิจ) 1→N กองทุน (ตัวรับเงิน) 1→N แคมเปญ (รอบ/กิจกรรม) — `SV-CR-006` · FT-18 · SV-ADR-086/087 · `T-125`
@@ -245,10 +245,8 @@ export interface CampaignListItemView extends FundraisingListItemBase {
 
 /** `GET /campaigns/:id` */
 export interface CampaignView extends CampaignListItemView, FundraisingViewBase {
-  /** โหมดของที่ระลึก (`SV-CR-008` · `T-132`) — แก้ผ่าน `PUT /campaigns/:id/souvenir-rules` เท่านั้น */
+  /** โหมดของที่ระลึก (`SV-CR-008` · `T-132`) — แก้ผ่าน `PATCH /campaigns/:id/souvenir-mode` (หรือ `PUT …/souvenir-rules` เดิม) · ชนิดสต็อกอยู่ต่อของ (`GET …/souvenirs` · `T-194`) */
   souvenirRuleMode: CampaignSouvenirRuleMode;
-  /** นโยบายสต็อก (`T-133`) — แก้ผ่าน `PATCH /campaigns/:id/stock-policy` เท่านั้น */
-  stockPolicy: CampaignStockPolicy;
 }
 
 /** body ของ `POST /campaigns` — `PATCH` = `Partial` */
