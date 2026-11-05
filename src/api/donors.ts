@@ -200,6 +200,19 @@ export interface DonorAddressView {
   postcode: string | null;
 }
 
+/**
+ * ลำดับของ `GET /donors` (`?sort=`) — ไม่ส่ง = `created_at DESC, id DESC` (เดิม) · `last_donation_*` = วันที่บริจาคล่าสุด
+ * (ยังไม่เคยบริจาค = ท้ายสุดเสมอทั้ง 2 ทิศ · ค่าเท่ากันเรียง `created_at DESC, id DESC` ต่อ · `SV-CR-017` §4 · `T-182`)
+ */
+export const DonorSort = {
+  LAST_DONATION_ASC: 'last_donation_asc',
+  LAST_DONATION_DESC: 'last_donation_desc',
+} as const;
+export type DonorSort = (typeof DonorSort)[keyof typeof DonorSort];
+
+/** เพดานของตัวกรอง `inactiveDaysMin` / `inactiveDaysMax` (จำนวนวัน · ~100 ปี) — เกิน = 400 */
+export const DONOR_INACTIVE_DAYS_MAX = 36_500;
+
 /** แถวในหน้า list (`GET /donors`) */
 export interface DonorListItemView {
   id: string;
@@ -220,6 +233,11 @@ export interface DonorListItemView {
   donationCount: number;
   /** DECIMAL(15,2) เป็นข้อความ (`"0.00"`) — กันทศนิยมเพี้ยน · เว็บแสดง `1,234.00` */
   donationTotal: string;
+  /**
+   * วันที่บริจาคล่าสุด `YYYY-MM-DD` (`donors.last_donation_date` · `SV-CR-017` §4 · SV-ADR-131) = `MAX(donation_date)` ของรายการที่นับยอด
+   * (`DONATION_COUNTED_STATUSES` · ไม่ถูกลบ — คำนวณพร้อม `donationCount`/`donationTotal`) · ยังไม่เคย = `null` · "n วันที่แล้ว" = `daysSince(…, thaiTodayYmd())`
+   */
+  lastDonationDate: string | null;
   /** กลุ่มผู้บริจาค (`SV-CR-016` §4) — chip สี + ไอคอน · ไม่มีกลุ่ม = `null` · ลิงก์ `/donor-groups/:id` ตามสิทธิ์ `donor_groups` */
   group: DonorGroupRef | null;
   /**

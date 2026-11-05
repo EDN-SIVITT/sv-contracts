@@ -329,6 +329,8 @@ export interface DonationListQuery {
   /** id ของกองทุน หรือ `DONATION_FUND_FILTER_NONE` (`'none'`) = ยังไม่ระบุกองทุน (จัดข้อมูลเดิม) — `T-126` */
   fundId?: string;
   campaignId?: string;
+  /** แหล่งที่มา (`SV-CR-017` §5 · `T-183`) — `LINE_OA` ผู้บริจาคแจ้งเองผ่าน LINE OA · `STAFF` เจ้าหน้าที่บันทึกใน CMS · ค่าอื่น = 400 */
+  source?: DonationSource;
   page?: number;
   perPage?: number;
 }

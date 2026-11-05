@@ -1,4 +1,5 @@
 import { APP_BRAND } from '../brand';
+import type { BrandingLiffView } from './liff-theme';
 
 /**
  * ชื่อ / ชื่อย่อ / ไอคอนระบบ — `REQ-SET-028/029/030` · SV-ADR-036 (`SV-CR-001` ข้อ 2)
@@ -45,6 +46,11 @@ export interface BrandingView {
   name: { th: string; en: string };
   shortName: string;
   icon: Pick<SystemIconSummary, 'version' | 'sizes'> | null;
+  /**
+   * ธีม/ภาษาของหน้า LINE OA ผู้บริจาค (`SV-CR-017` §6 · SV-ADR-132) — ไม่มีแถว/ค่าเสีย = ค่าเริ่มต้น (`BRANDING_LIFF_DEFAULTS`) ·
+   * เว็บอ่านด้วย `readBrandingLiff()` (API รุ่นเก่าไม่ส่ง = ค่าเริ่มต้น)
+   */
+  liff: BrandingLiffView;
 }
 
 /** ชื่อระบบตามภาษา — ภาษาที่ขอว่าง → อีกภาษา → `APP_BRAND.name` */

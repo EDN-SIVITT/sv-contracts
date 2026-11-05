@@ -1,4 +1,5 @@
 import type { LineChannel } from '../enums/line';
+import { LIFF_LOCALES } from './liff';
 import { PAGINATION_OPTIONS } from './response';
 import { SMS_PROVIDERS, SmsProvider } from './sms';
 
@@ -24,8 +25,13 @@ export const SettingGroup = {
   DONATION: 'donation',
   /** โครงสร้างการรับบริจาค (e-Donation · `SV-CR-007` · SV-ADR-090 · `T-131`) — เปิด/ปิดชั้นโปรแกรม (3 ชั้น ↔ 4 ชั้น) */
   FUNDRAISING: 'fundraising',
-  /** Chat (`SV-CR-015` · SV-ADR-115/116) — สถานะการตอบสนอง (เปิด/ปิด · เกณฑ์นาที) · แฟล็ก · "อ่านแล้ว" ใน LINE — ค่า/parser กลาง `./chat-settings.ts` */
+  /** Chat (`SV-CR-015` · SV-ADR-115/116 · `SV-CR-017` SV-ADR-127/128) — สถานะการตอบสนอง (เปิด/ปิด · เกณฑ์นาที) · แฟล็ก · โหมด "อ่านแล้ว" ใน LINE · สีห้องแชท — ค่า/parser กลาง `./chat-settings.ts` */
   CHAT: 'chat',
+  /**
+   * LINE OA ผู้บริจาค (`SV-CR-017` §6 · SV-ADR-132 · `T-184`) — ปกโปรไฟล์ · พื้นหลังหน้าบัญชีของฉัน (รูปแบบ managed) · ปุ่มเปลี่ยนภาษา + ภาษาหลัก ·
+   * ค่า/parser กลาง `./liff-theme.ts` · หน้าเว็บอ่านผ่าน `GET /branding` `liff` (public)
+   */
+  LIFF: 'liff',
 } as const;
 export type SettingGroup = (typeof SettingGroup)[keyof typeof SettingGroup];
 
@@ -169,15 +175,48 @@ export const SettingKey = {
   CHAT_RESPONSE_OVERDUE_MINUTES: 'chat.responseOverdueMinutes',
   /** นิยามแฟล็ก (JSON `ChatFlag[]` ≤ 10) — ตรวจด้วย `validateChatFlags` ตอนบันทึก · SV-ADR-116 */
   CHAT_FLAGS: 'chat.flags',
-  /** ตอบ/รับทราบแล้วส่ง "อ่านแล้ว" ให้ผู้บริจาคใน LINE (`markAsRead`) — ค่าเริ่มต้น `CHAT_LINE_READ_RECEIPT_DEFAULT_ENABLED` */
-  CHAT_LINE_READ_RECEIPT_ENABLED: 'chat.lineReadReceiptEnabled',
+  /**
+   * เมื่อไหร่ผู้บริจาคเห็น "อ่านแล้ว" ใน LINE (`markAsRead` · `SV-CR-017` §1 · SV-ADR-128) — `ChatLineReadReceiptMode`: `IMMEDIATE` (ทันทีที่ข้อความเข้า · ค่าเริ่มต้น) ·
+   * `ON_RESPONSE` (เมื่อตอบ/รับทราบ) · ค่าเสีย/ไม่มีแถว = `CHAT_LINE_READ_RECEIPT_DEFAULT_MODE` · แถวมาจาก `0043`
+   */
+  CHAT_LINE_READ_RECEIPT_MODE: 'chat.lineReadReceiptMode',
   /**
    * จำนวนห้องต่อหน้าของช่องรายชื่อ Chat เมื่อไม่ส่ง `perPage` (`SV-CR-016` §2 · SV-ADR-120 · `REQ-SET-055`) — ค่าใน `SETTING_NUMBER_OPTIONS` (20/50/100) ·
    * ค่าเริ่มต้น `CHAT_THREADS_PER_PAGE_DEFAULT` (50) · ใช้เฉพาะ `GET /chat/threads` (รายการข้อความไม่เกี่ยว · list อื่นยังใช้ `general.defaultPerPage`)
    */
   CHAT_THREADS_PER_PAGE: 'chat.threadsPerPage',
+  /**
+   * สีห้องแชท 4 ค่า `#RRGGBB` (`SV-CR-017` §1 · SV-ADR-127 · `0043`) — สีตัวอักษรในบับเบิล (ทั้ง 2 ฝั่ง) · บับเบิลผู้บริจาค (ขาเข้า) · บับเบิลเจ้าหน้าที่ (ขาออก) · พื้นกระดาน ·
+   * ค่าเริ่มต้นแบบ LINE `CHAT_APPEARANCE_DEFAULTS` · หน้า Chat อ่านผ่าน `GET /chat/config` `appearance` (ค่าเสีย = ค่าเริ่มต้นของช่องนั้น · `readChatAppearance`)
+   */
+  CHAT_COLOR_TEXT: 'chat.colorText',
+  CHAT_COLOR_DONOR_BUBBLE: 'chat.colorDonorBubble',
+  CHAT_COLOR_STAFF_BUBBLE: 'chat.colorStaffBubble',
+  CHAT_COLOR_BOARD_BACKGROUND: 'chat.colorBoardBackground',
+  /**
+   * รูปปก section แรกของ "บัญชีของฉัน" / พื้นหลังหน้าบัญชีของฉัน บนหน้า LINE OA (JSON descriptor · `SV-CR-017` §6 · SV-ADR-132 · `0046`) —
+   * **จัดการผ่าน `/settings/liff/images/:slot` เท่านั้น** อยู่ใน `MANAGED_SETTING_KEYS` · ว่าง = หน้าตาเดิม (gradient · `bg-page`) · แผนที่ช่อง → key `LIFF_THEME_SLOT_SETTING_KEY`
+   */
+  LIFF_PROFILE_COVER_IMAGE: 'liff.profileCoverImage',
+  LIFF_PAGE_BACKGROUND_IMAGE: 'liff.pageBackgroundImage',
+  /** แสดงปุ่มเปลี่ยนภาษา (TH/EN) บนหัวหน้า LINE OA — ค่าเริ่มต้น `true` · ปิด = ใช้ `liff.defaultLocale` เสมอ (SV-ADR-132) */
+  LIFF_LANGUAGE_SWITCHER_ENABLED: 'liff.languageSwitcherEnabled',
+  /** ภาษาหลักของหน้า LINE OA `th`/`en` (บังคับ · ค่าอื่น 422) — เปิดปุ่ม = ภาษาเริ่มต้นก่อนผู้บริจาคเลือกเอง · ปิดปุ่ม = ภาษาที่ใช้เสมอ · ค่าเริ่มต้น `th` */
+  LIFF_DEFAULT_LOCALE: 'liff.defaultLocale',
 } as const;
 export type SettingKey = (typeof SettingKey)[keyof typeof SettingKey];
+
+/**
+ * ค่าของ `chat.lineReadReceiptMode` (SV-ADR-128) — อยู่ไฟล์นี้ (ไม่ใช่ `./chat-settings.ts`) เพราะ `SETTING_STRING_RULES` ต้องใช้ตอนโหลดโมดูล และ `chat-settings` import ไฟล์นี้อยู่แล้ว (กัน import วน)
+ * - `IMMEDIATE` — webhook ข้อความเข้าที่มี `markAsReadToken` → ส่ง "อ่านแล้ว" ทันทีหลังบันทึก (ค่าเริ่มต้น · ตรงกับ LINE OA ที่ปิด Chat)
+ * - `ON_RESPONSE` — ส่งเมื่อเจ้าหน้าที่ตอบหรือกดรับทราบ (เปิดดูห้องใน CMS ยังไม่ส่ง · SV-ADR-115)
+ */
+export const ChatLineReadReceiptMode = {
+  IMMEDIATE: 'IMMEDIATE',
+  ON_RESPONSE: 'ON_RESPONSE',
+} as const;
+export type ChatLineReadReceiptMode = (typeof ChatLineReadReceiptMode)[keyof typeof ChatLineReadReceiptMode];
+export const CHAT_LINE_READ_RECEIPT_MODES: readonly ChatLineReadReceiptMode[] = Object.values(ChatLineReadReceiptMode);
 
 /**
  * อายุขั้นต่ำของ audit log ที่ปุ่มลบจะแตะได้ — REQ-LOG-005 · ADR-024 (คำตอบของ HST `Q-022`)
@@ -281,7 +320,7 @@ export interface SettingStringRule {
   multiline?: boolean;
 }
 
-/** สี `#RRGGBB` (สีสถานะออเดอร์ · SV-ADR-075 · สีเลขที่ · SV-ADR-078 · สีสถานะรายการบริจาค · SV-ADR-080) — บังคับ · ตัวพิมพ์เล็ก/ใหญ่ได้ · ไม่ตรง = `INVALID_FORMAT` */
+/** สี `#RRGGBB` (สีสถานะออเดอร์ · SV-ADR-075 · สีเลขที่ · SV-ADR-078 · สีสถานะรายการบริจาค · SV-ADR-080 · สีห้องแชท · SV-ADR-127) — บังคับ · ตัวพิมพ์เล็ก/ใหญ่ได้ · ไม่ตรง = `INVALID_FORMAT` */
 const HEX_COLOR_RULE: SettingStringRule = { required: true, maxChars: 7, pattern: /^#[0-9A-Fa-f]{6}$/ };
 
 export const SETTING_STRING_RULES: Readonly<Record<string, SettingStringRule>> = {
@@ -327,6 +366,15 @@ export const SETTING_STRING_RULES: Readonly<Record<string, SettingStringRule>> =
   [SettingKey.DONATION_STATUS_COLOR_CONFIRMED]: HEX_COLOR_RULE,
   [SettingKey.DONATION_STATUS_COLOR_ORDERED]: HEX_COLOR_RULE,
   [SettingKey.DONATION_STATUS_COLOR_REJECTED]: HEX_COLOR_RULE,
+  // SV-ADR-127 — สีห้องแชท (ค่าเสียที่แก้ตรง DB → `GET /chat/config` ใช้ค่าเริ่มต้นของช่องนั้น)
+  [SettingKey.CHAT_COLOR_TEXT]: HEX_COLOR_RULE,
+  [SettingKey.CHAT_COLOR_DONOR_BUBBLE]: HEX_COLOR_RULE,
+  [SettingKey.CHAT_COLOR_STAFF_BUBBLE]: HEX_COLOR_RULE,
+  [SettingKey.CHAT_COLOR_BOARD_BACKGROUND]: HEX_COLOR_RULE,
+  // SV-ADR-128 — โหมด "อ่านแล้ว" ใน LINE: ค่านอกชุด = 422 `INVALID_FORMAT`
+  [SettingKey.CHAT_LINE_READ_RECEIPT_MODE]: { required: true, maxChars: 20, allowedValues: CHAT_LINE_READ_RECEIPT_MODES },
+  // SV-ADR-132 — ภาษาหลักของหน้า LINE OA: ต้องมีค่าเสมอ (ปิดปุ่มภาษาแล้วต้องรู้ว่าใช้ภาษาไหน) · ค่านอกชุด = 422 `INVALID_FORMAT`
+  [SettingKey.LIFF_DEFAULT_LOCALE]: { required: true, maxChars: 2, allowedValues: LIFF_LOCALES },
 };
 
 /**
@@ -386,7 +434,12 @@ export function settingStringProblem(key: string, value: string): SettingStringP
  * key ที่มี endpoint จัดการเอง (SV-ADR-036) — `PATCH /settings/:group` ข้ามเงียบ ๆ (แบบ key ที่ไม่รู้จัก — REQ-SEC-021)
  * `GET /settings/:group` คืนแค่สรุปที่ไม่มีรายละเอียดภายใน · หน้าเว็บไม่วาดในฟอร์มทั่วไป
  */
-export const MANAGED_SETTING_KEYS: readonly string[] = [SettingKey.GENERAL_SYSTEM_ICON];
+export const MANAGED_SETTING_KEYS: readonly string[] = [
+  SettingKey.GENERAL_SYSTEM_ICON,
+  // SV-ADR-132 — รูปธีมหน้า LINE OA (`/settings/liff/images/:slot`)
+  SettingKey.LIFF_PROFILE_COVER_IMAGE,
+  SettingKey.LIFF_PAGE_BACKGROUND_IMAGE,
+];
 
 /** บีบค่าให้อยู่ในช่วงที่รับได้ — ใช้ตอน "อ่าน" ค่าที่อาจถูกเขียนไว้ก่อนมีกฎนี้ */
 export function clampSettingNumber(key: string, value: number, fallback: number): number {

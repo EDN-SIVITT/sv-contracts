@@ -50,6 +50,10 @@ export const ErrorCode = {
   CHAT_ASSIGNEE_NOT_ELIGIBLE: 'CHAT_ASSIGNEE_NOT_ELIGIBLE',
   /** แฟล็กที่เลือกไม่มีใน ตั้งค่า → Chat แล้ว (ถูกลบระหว่างเปิดหน้า · 422 · SV-ADR-116) — `details { flagId }` · หน้าเว็บโหลดค่าใหม่ */
   CHAT_FLAG_UNKNOWN: 'CHAT_FLAG_UNKNOWN',
+  /** Broadcast: ข้อความว่าง (หลังตัดช่องว่าง) / ยาวเกิน 5,000 (422 · `SV-CR-017` §3 · SV-ADR-130) — `details { field: 'text', reason: 'EMPTY' | 'TOO_LONG', max }` */
+  CHAT_BROADCAST_TEXT_INVALID: 'CHAT_BROADCAST_TEXT_INVALID',
+  /** Broadcast ตามกลุ่ม: ไม่ได้เลือกกลุ่ม / กลุ่มที่เลือกไม่มีผู้บริจาคที่ผูก LINE เลย (422) — `details { field: 'target.groupIds', groupIds }` · หน้าเว็บโหลดจำนวนใหม่ */
+  CHAT_BROADCAST_NO_RECIPIENTS: 'CHAT_BROADCAST_NO_RECIPIENTS',
   // ── หน้า LINE OA ของผู้บริจาค (LIFF · `SV-CR-003` ข้อ 2 · FT-14 · SV-ADR-044/045/046 · `T-074`) ──
   /** ไม่มี / ตรวจไม่ผ่าน / หมดอายุ — LINE ID token ใน header `X-Line-Id-Token` (401) · หน้าเว็บขอ token ใหม่แล้วลองอีกครั้ง */
   LINE_ID_TOKEN_INVALID: 'LINE_ID_TOKEN_INVALID',

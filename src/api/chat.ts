@@ -1,6 +1,6 @@
 import { ChatMessageType, type ChatMessageDirection } from '../enums/chat';
 import type { LineChannel } from '../enums/line';
-import type { ChatFlag } from './chat-settings';
+import type { ChatAppearance, ChatFlag } from './chat-settings';
 
 /** รายการคู่สนทนาที่ CMS เห็น — ข้อมูลตัวตนมาจาก LINE account เท่านั้น (`REQ-CHT-001`) */
 export interface ChatThreadListItemView {
@@ -35,6 +35,19 @@ export interface ChatThreadListItemView {
   /** เจ้าหน้าที่ผู้ดูแลห้อง (SV-ADR-117) · ไม่มี / ผู้ใช้ถูกลบ = `null` */
   assignee: ChatUserRef | null;
   assignedAt: string | null;
+  /**
+   * `SV-CR-017` §2 · SV-ADR-129 — ผู้บริจาค (ยังไม่ลบ) ที่ผูก LINE ของห้องนี้ · ยังไม่ผูก = `null`
+   * join ตอนอ่าน (`donors.line_user_active` unique = 1:1) — ผูก/ยกเลิก/แก้ชื่อจากที่ไหนก็ได้ค่าล่าสุดเมื่อโหลดใหม่
+   */
+  donor: ChatThreadDonorRef | null;
+}
+
+/** ผู้บริจาคแบบย่อในรายชื่อห้อง (SV-ADR-129) — `fullName` `null` = สมัครเองแต่ยังไม่กรอกฟอร์ม (เว็บแสดง `donors.pendingName`) */
+export interface ChatThreadDonorRef {
+  id: string;
+  /** รหัสผู้บริจาค (`donors.donor_code`) */
+  code: string;
+  fullName: string | null;
 }
 
 /** ผู้ใช้ระบบแบบย่อ (id · ชื่อ-นามสกุล) — ผู้ดูแลห้อง · ผู้ตอบสนองล่าสุด · รายชื่อที่มอบหมายได้ */
@@ -106,6 +119,14 @@ export const CHAT_THREAD_SCOPES = [ChatThreadScope.ALL, ChatThreadScope.MINE] as
 /** ค่าในตัวกรอง `flag=` / `assignee=` ที่หมายถึง "ไม่มีแฟล็ก" / "ยังไม่มีผู้ดูแล" */
 export const CHAT_FILTER_NONE = 'none';
 
+/** ค่าในตัวกรอง `linked=` (SV-ADR-129) — ห้องที่ LINE ผูกกับผู้บริจาคแล้ว / ยังไม่ผูก · ส่งทั้งสองค่า = ทุกห้อง */
+export const ChatThreadLinked = {
+  YES: 'yes',
+  NO: 'no',
+} as const;
+export type ChatThreadLinked = (typeof ChatThreadLinked)[keyof typeof ChatThreadLinked];
+export const CHAT_THREAD_LINKED_VALUES = [ChatThreadLinked.YES, ChatThreadLinked.NO] as const;
+
 /** แนบมากับผลของ `GET /chat/threads` (ไม่ขึ้นกับตัวกรอง) — ตัวเลขบนแท็บ "ของฉัน" */
 export interface ChatThreadListSummary {
   mine: {
@@ -127,6 +148,8 @@ export interface ChatConfigView {
   };
   /** `chat.flags` (ผ่าน `readChatFlags` แล้ว) */
   flags: ChatFlag[];
+  /** สีห้องแชท 4 ค่า (`chat.color*` ผ่าน `readChatAppearance` แล้ว — ค่าเสีย = ค่าเริ่มต้นของช่องนั้น · `SV-CR-017` §1 · SV-ADR-127) */
+  appearance: ChatAppearance;
 }
 
 /** body ของ `PUT /chat/threads/:id/flag` — `null` = เอาแฟล็กออก */
