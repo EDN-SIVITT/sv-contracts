@@ -281,6 +281,12 @@ export interface DonationDonorView {
   deleted: boolean;
 }
 
+/** ผู้บริจาคในหน้า view (`GET /donations/:id`) — เพิ่มจำนวนครั้งที่บริจาค (`T-199` · `SV-CR-020` §3 · REQ-DNT-041) — list ไม่มีช่องนี้ */
+export interface DonationViewDonorView extends DonationDonorView {
+  /** จำนวนรายการบริจาคของผู้บริจาคนี้ **ทุกสถานะ** (รวมรายการนี้) ไม่รวมที่ลบ (soft) · นับที่ API เสมอ · ผู้บริจาคถูกลบยังนับ (หน้าเว็บซ่อน) */
+  donationCount: number;
+}
+
 /**
  * 1 แถวของที่ระลึกในรายการ — `souvenirCode` `souvenirName` `unit` `unitValue` `unitDonationThreshold` = snapshot ณ ตอนบันทึก (แก้รายการ = คิดค่าปัจจุบันใหม่ทั้งชุด)
  * `souvenirValue` `souvenirDonationThreshold` `souvenirStatus` `stockOnHand` `imageVersion` = ค่าปัจจุบันของสินค้า (`null` = สินค้าถูกลบ) — ฟอร์มแก้ไขใช้คิดงบใหม่/เตือนสต็อก/badge ระงับ
@@ -440,6 +446,8 @@ export interface DonationListResponse extends ApiListResponse<DonationListItemVi
  * รายการก่อน `0016` (ยังไม่บันทึกผู้รับ) = คิดจากผู้บริจาค ณ ตอนนี้ด้วยกติกาเดียวกับออเดอร์ (ชื่อว่าง = `''`) — บันทึกครั้งถัดไปเขียนลง DB
  */
 export interface DonationView extends DonationListItemView, OrderRecipientView {
+  /** ผู้บริจาค (join สด) + จำนวนครั้งที่บริจาค (`T-199`) */
+  donor: DonationViewDonorView;
   /** มีค่าเฉพาะ `REJECTED` */
   rejectReason: string | null;
   /** ผู้ยืนยัน/ปฏิเสธ + เวลา — ตั้งเมื่อเปลี่ยนเป็น CONFIRMED/REJECTED · กลับเป็น PENDING = `null` */

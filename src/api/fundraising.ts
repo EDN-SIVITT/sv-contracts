@@ -266,6 +266,16 @@ export interface CampaignListQuery extends Omit<FundraisingListQuery, 'sort'> {
   programId?: string;
   fundId?: string;
   sort?: CampaignSort;
+  /**
+   * ปี ค.ศ. `CAMPAIGN_YEAR_MIN`–`CAMPAIGN_YEAR_MAX` (`T-200` · SV-ADR-147) — แคมเปญที่ช่อง "ปี" = ปีนั้น หรือช่วงแคมเปญคาบเกี่ยวปีนั้น:
+   * ปีเริ่ม = วันเริ่ม → ช่อง "ปี" → ปีที่สร้าง (เวลาไทย) · ปีสิ้นสุด = วันสิ้นสุด → (ไม่มีวันเริ่ม + มีช่อง "ปี" = ปีนั้น) → ยังดำเนินอยู่ ถึงปีปัจจุบัน (ไม่ลามปีอนาคต)
+   */
+  year?: number;
+}
+
+/** `GET /campaigns/years` (campaigns READ_ONLY · `T-200`) — ตัวเลือกของตัวกรองปี: ทุกปี ค.ศ. ที่มีแคมเปญ (ที่ยังไม่ลบ) ตามกติกาของ `year=` · ใหม่ → เก่า */
+export interface CampaignYearsResponse {
+  years: number[];
 }
 
 // ── ตัวเลือก (`GET /programs/options`) ───────────────────────────────────────────────────────────

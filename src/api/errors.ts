@@ -54,6 +54,18 @@ export const ErrorCode = {
   CHAT_BROADCAST_TEXT_INVALID: 'CHAT_BROADCAST_TEXT_INVALID',
   /** Broadcast ตามกลุ่ม: ไม่ได้เลือกกลุ่ม / กลุ่มที่เลือกไม่มีผู้บริจาคที่ผูก LINE เลย (422) — `details { field: 'target.groupIds', groupIds }` · หน้าเว็บโหลดจำนวนใหม่ */
   CHAT_BROADCAST_NO_RECIPIENTS: 'CHAT_BROADCAST_NO_RECIPIENTS',
+  // ── รูปแนบใน Chat / Broadcast (`SV-CR-020` §1 · `REQ-CHT-033/034` · SV-ADR-145 · `T-198`) ──
+  /** อัปโหลดรูป: ไม่ใช่ JPEG/PNG/WebP (ตรวจจากเนื้อไฟล์) · ไฟล์เสีย · พิกเซลเกิน (422) — `details { field: 'file', reason: 'REQUIRED' \| 'TYPE' \| 'CORRUPT' \| 'DIMENSIONS' }` */
+  CHAT_IMAGE_INVALID: 'CHAT_IMAGE_INVALID',
+  /** อัปโหลดรูป: ไฟล์ใหญ่เกิน 10 MB (413) — `details { field: 'file', maxMb }` */
+  CHAT_IMAGE_TOO_LARGE: 'CHAT_IMAGE_TOO_LARGE',
+  /** ส่งแชท/Broadcast: `imageIds` ไม่พบ / ไม่ใช่รูปที่ผู้ส่งอัปโหลดเอง (422) — `details { field: 'imageIds', imageId }` · หน้าเว็บให้แนบใหม่ */
+  CHAT_IMAGE_UNAVAILABLE: 'CHAT_IMAGE_UNAVAILABLE',
+  /**
+   * ส่งรูปเข้า LINE: สร้าง URL สาธารณะของรูปไม่ได้ (422) — origin ของเว็บที่ส่งไม่อยู่ใน `CORS_ORIGINS` / ไม่ใช่ https (LINE จริงรับเฉพาะ https) ·
+   * `details { reason: 'ORIGIN_NOT_ALLOWED' \| 'HTTPS_REQUIRED' \| 'URL_TOO_LONG', origin }`
+   */
+  CHAT_IMAGE_URL_UNAVAILABLE: 'CHAT_IMAGE_URL_UNAVAILABLE',
   // ── หน้า LINE OA ของผู้บริจาค (LIFF · `SV-CR-003` ข้อ 2 · FT-14 · SV-ADR-044/045/046 · `T-074`) ──
   /** ไม่มี / ตรวจไม่ผ่าน / หมดอายุ — LINE ID token ใน header `X-Line-Id-Token` (401) · หน้าเว็บขอ token ใหม่แล้วลองอีกครั้ง */
   LINE_ID_TOKEN_INVALID: 'LINE_ID_TOKEN_INVALID',

@@ -1,6 +1,6 @@
 import type { LineChannel } from '../enums/line';
 import type { ErrorCode } from './errors';
-import { CHAT_MESSAGE_MAX_LENGTH, type ChatUserRef } from './chat';
+import { CHAT_MESSAGE_MAX_LENGTH, type ChatImageView, type ChatUserRef } from './chat';
 import type { DonorGroupRef } from './donor-groups';
 
 // ── Broadcast จากหน้า Chat (`SV-CR-017` §3 · FT-10 `REQ-CHT-028` · SV-ADR-130 · `T-181`) ─────────────────────────────
@@ -38,10 +38,13 @@ export const CHAT_BROADCAST_HISTORY_PER_PAGE = 20;
 
 export type ChatBroadcastTextProblem = 'EMPTY' | 'TOO_LONG';
 
-/** ตรวจข้อความแบบเดียวกันทั้งเว็บและ API — ว่าง (หลังตัดช่องว่าง) · ยาวเกิน */
-export function chatBroadcastTextProblem(text: string): ChatBroadcastTextProblem | null {
+/**
+ * ตรวจข้อความแบบเดียวกันทั้งเว็บและ API — ว่าง (หลังตัดช่องว่าง) · ยาวเกิน ·
+ * `hasImages` = แนบรูปแล้ว → ข้อความว่างได้ (ต้องมีอย่างน้อย 1 อย่าง · `REQ-CHT-034` · `T-198`)
+ */
+export function chatBroadcastTextProblem(text: string, hasImages = false): ChatBroadcastTextProblem | null {
   const trimmed = text.trim();
-  if (!trimmed) return 'EMPTY';
+  if (!trimmed) return hasImages ? null : 'EMPTY';
   if (trimmed.length > CHAT_BROADCAST_TEXT_MAX_LENGTH) return 'TOO_LONG';
   return null;
 }
@@ -82,7 +85,10 @@ export interface ChatBroadcastTargetInput {
 export interface ChatBroadcastCreateInput {
   channel: LineChannel;
   target: ChatBroadcastTargetInput;
+  /** ว่างได้เมื่อแนบรูป (`imageIds`) */
   text: string;
+  /** id จาก `POST /chat/images` ของผู้ส่งเอง ≤ `CHAT_IMAGE_MAX_PER_SEND` (`REQ-CHT-034`) — ส่งเป็นรูปก่อน แล้วข้อความท้าย */
+  imageIds?: string[];
   /** UUID ที่เว็บสุ่มต่อการกดยืนยัน 1 ครั้ง — ส่งซ้ำค่าเดิม = ได้แถวเดิมโดยไม่ส่งซ้ำ (ไม่บันทึก audit ซ้ำ) */
   clientRequestId: string;
 }
@@ -108,7 +114,10 @@ export interface ChatBroadcastView {
   id: string;
   channel: LineChannel;
   target: ChatBroadcastTargetView;
+  /** ว่างได้เมื่อส่งรูปอย่างเดียว */
   text: string;
+  /** รูปที่ส่ง (ลำดับเดิม · `REQ-CHT-034`) — ไม่มี = `[]` · รูปที่ไม่พบแล้วถูกตัดออก */
+  images: ChatImageView[];
   /** ALL = `null` (LINE ไม่บอกจำนวนผู้ติดตาม) */
   recipientCount: number | null;
   /** จำนวนผู้รับในชุดที่ LINE รับแล้ว / ล้ม — ALL = `null` (ดูจาก `status`) */

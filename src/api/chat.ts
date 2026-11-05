@@ -220,6 +220,56 @@ export const CHAT_MESSAGE_MAX_LENGTH = 5000;
  */
 export const CHAT_CLIENT_MESSAGE_ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
 
+// ── รูปแนบ (`SV-CR-020` §1 · `REQ-CHT-033/034` · SV-ADR-145 · `T-198`) ─────────────────────────────────────────────
+
+/** รูปต่อการส่ง 1 ครั้ง — LINE push/broadcast/multicast รับ ≤ 5 message ต่อคำขอ = รูป 4 + ข้อความ 1 */
+export const CHAT_IMAGE_MAX_PER_SEND = 4;
+/** ไฟล์ที่อัปโหลด (ก่อนแปลง) ≤ 10 MB — เพดานของ LINE สำหรับ `originalContentUrl` (API แปลงเป็น JPEG ที่เล็กกว่านี้เสมอ) */
+export const CHAT_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+/** ชนิดที่รับ (ตรวจจากเนื้อไฟล์ที่ API · `accept` ของ `<input type=file>`) */
+export const CHAT_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
+/** ด้านยาวสุด (px) หลังแปลงเป็น JPEG — ต้นฉบับที่ LINE เปิดดู / พรีวิวในแชท LINE (≤ 1 MB เสมอ) */
+export const CHAT_IMAGE_ORIGINAL_MAX_PX = 2048;
+export const CHAT_IMAGE_PREVIEW_MAX_PX = 240;
+/** route สาธารณะบน origin ของเว็บ (`app/chat-image/[token]/[variant]`) — token = สิทธิ์ (ไม่ต้อง login · LINE ดึงรูปเอง) */
+export const CHAT_IMAGE_PATH = '/chat-image';
+/** token สุ่ม 256 bit (hex ตัวเล็ก) */
+export const CHAT_IMAGE_TOKEN_PATTERN = /^[0-9a-f]{64}$/;
+export const ChatImageVariant = {
+  ORIGINAL: 'original',
+  PREVIEW: 'preview',
+} as const;
+export type ChatImageVariant = (typeof ChatImageVariant)[keyof typeof ChatImageVariant];
+export const CHAT_IMAGE_VARIANTS = [ChatImageVariant.ORIGINAL, ChatImageVariant.PREVIEW] as const;
+
+/** path ของรูปบน origin ของเว็บ (ไม่มี origin) — `/chat-image/<token>/<variant>` */
+export function chatImagePath(token: string, variant: ChatImageVariant): string {
+  return `${CHAT_IMAGE_PATH}/${token}/${variant}`;
+}
+
+/** `POST /chat/images` (multipart `file`) — รูปที่แปลงแล้ว · `previewUrl` = path พรีวิวบน origin ของเว็บ (`chatImagePath`) */
+export interface ChatImageView {
+  id: string;
+  width: number;
+  height: number;
+  /** byte ของ JPEG ต้นฉบับหลังแปลง */
+  size: number;
+  previewUrl: string;
+}
+
+/** body ของ `POST /chat/threads/:id/messages` — ต้องมีข้อความหรือรูปอย่างน้อย 1 อย่าง */
+export interface ChatSendMessageInput {
+  text?: string;
+  /** id จาก `POST /chat/images` ของผู้ส่งเอง (≤ `CHAT_IMAGE_MAX_PER_SEND` · ลำดับ = ลำดับที่ส่ง) */
+  imageIds?: string[];
+  clientMessageId?: string;
+}
+
+/** ผลของ `POST /chat/threads/:id/messages` — 1 แถวต่อ LINE message (รูปก่อน ข้อความท้าย · เรียงตาม id) */
+export interface ChatSendResultView {
+  messages: ChatMessageView[];
+}
+
 /** `GET /chat/threads/:id/messages` — ขนาดหน้าเริ่มต้น/สูงสุด (`REQ-CHT-013`) */
 export const CHAT_MESSAGE_PAGE_DEFAULT = 50;
 export const CHAT_MESSAGE_PAGE_MAX = 100;
