@@ -15,7 +15,7 @@ import type { SouvenirStatus } from './souvenirs';
 /**
  * สถานะออเดอร์ (SV-ADR-074 · `T-110` — แทนตารางสถานะของ SV-ADR-050) — ลำดับ key = ลำดับงานซ้าย→ขวา (แท็บ/ตัวกรอง/timeline ใช้ลำดับนี้)
  * `DRAFT` รอยืนยัน (ค่าใน DB คงชื่อเดิม) · `CONFIRMED` ยืนยัน (ตัดสต็อกแล้ว) · `PREPARING` เตรียมจัดส่ง · `SHIPPED` จัดส่งแล้ว · `RECEIVED` รับสินค้าแล้ว ·
- * `CANCELLED` ยกเลิก (คืนสต็อกถ้าถืออยู่)
+ * `COMPLETED` เสร็จสิ้น (สถานะสุดท้ายถาวร · ล็อกทุกทางเขียน · SV-ADR-149 · `T-202`) · `CANCELLED` ยกเลิก (คืนสต็อกถ้าถืออยู่)
  */
 export const OrderStatus = {
   DRAFT: 'DRAFT',
@@ -23,13 +23,15 @@ export const OrderStatus = {
   PREPARING: 'PREPARING',
   SHIPPED: 'SHIPPED',
   RECEIVED: 'RECEIVED',
+  COMPLETED: 'COMPLETED',
   CANCELLED: 'CANCELLED',
 } as const;
 export type OrderStatus = (typeof OrderStatus)[keyof typeof OrderStatus];
 
 /**
  * สายงานปกติ (ไม่รวม `CANCELLED`) เรียงขั้น — เข้าสถานะ X = ตั้งเวลาของ X · ล้างเวลาของขั้น**หลัง** X (ย้อนสถานะ) · ปุ่มหลักหน้า view = ขั้นถัดไปในสายนี้
- * เวลาต่อขั้น: `DRAFT` = `createdAt` · `CONFIRMED` `confirmedAt` · `PREPARING` `preparingAt` · `SHIPPED` `shippedAt` · `RECEIVED` `receivedAt`
+ * เวลาต่อขั้น: `DRAFT` = `createdAt` · `CONFIRMED` `confirmedAt` · `PREPARING` `preparingAt` · `SHIPPED` `shippedAt` · `RECEIVED` `receivedAt` · `COMPLETED` `completedAt`
+ * (`SHIPPED → COMPLETED` ข้ามรับสินค้า = `receivedAt` คง `null` · `RECEIVED → COMPLETED` = `receivedAt` คงเดิม)
  */
 export const ORDER_STATUS_FLOW: readonly OrderStatus[] = [
   OrderStatus.DRAFT,
@@ -37,9 +39,10 @@ export const ORDER_STATUS_FLOW: readonly OrderStatus[] = [
   OrderStatus.PREPARING,
   OrderStatus.SHIPPED,
   OrderStatus.RECEIVED,
+  OrderStatus.COMPLETED,
 ];
 
-/** ขั้นถัดไปของสายงาน — `nextOrderStatus('CONFIRMED')` → `'PREPARING'` · `RECEIVED`/`CANCELLED` → `null` */
+/** ขั้นถัดไปของสายงาน — `nextOrderStatus('CONFIRMED')` → `'PREPARING'` · `nextOrderStatus('RECEIVED')` → `'COMPLETED'` · `COMPLETED`/`CANCELLED` → `null` */
 export function nextOrderStatus(status: OrderStatus): OrderStatus | null {
   const index = ORDER_STATUS_FLOW.indexOf(status);
   return index < 0 || index === ORDER_STATUS_FLOW.length - 1 ? null : ORDER_STATUS_FLOW[index + 1];
@@ -47,16 +50,21 @@ export function nextOrderStatus(status: OrderStatus): OrderStatus | null {
 
 /**
  * ตารางเปลี่ยนสถานะ (SV-ADR-074) — **API ตรวจ** (ไม่ตรง → 409 `ORDER_STATUS_INVALID` details `{ from, to }`) และ **ปุ่มหน้าเว็บเลือก** จากตัวเดียวกัน
- * ฐาน = ไปสถานะอื่นได้ทุกตัว (ข้ามขั้น/ย้อนได้ · ยกเลิกจากสถานะใดก็ได้ · ย้อนจากยกเลิกได้) ยกเว้นตัวเอง — ระบบลูกจำกัดเองได้ที่ตารางนี้ตารางเดียว
+ * ฐาน SV-BASE = ไปสถานะอื่นได้ทุกตัว (ข้ามขั้น/ย้อนได้ · ยกเลิกจากสถานะใดก็ได้ · ย้อนจากยกเลิกได้) ยกเว้นตัวเอง — ระบบลูกจำกัดเองได้ที่ตารางนี้ตารางเดียว
+ * e-Donation จำกัด (SV-ADR-149 · `T-202`): `COMPLETED` เข้าได้จาก `SHIPPED`/`RECEIVED` เท่านั้น · `COMPLETED → []` (ไม่มีย้อน/ยกเลิก) · คู่อื่นเหมือนฐาน
  */
 const ALL_ORDER_STATUSES: readonly OrderStatus[] = Object.values(OrderStatus);
-const otherOrderStatuses = (self: OrderStatus): readonly OrderStatus[] => ALL_ORDER_STATUSES.filter((status) => status !== self);
+/** สถานะที่ไป `COMPLETED` ได้ (SV-ADR-149) */
+const ORDER_COMPLETABLE_FROM: readonly OrderStatus[] = [OrderStatus.SHIPPED, OrderStatus.RECEIVED];
+const otherOrderStatuses = (self: OrderStatus): readonly OrderStatus[] =>
+  ALL_ORDER_STATUSES.filter((status) => status !== self && (status !== OrderStatus.COMPLETED || ORDER_COMPLETABLE_FROM.includes(self)));
 export const ORDER_STATUS_TRANSITIONS: Readonly<Record<OrderStatus, readonly OrderStatus[]>> = {
   DRAFT: otherOrderStatuses(OrderStatus.DRAFT),
   CONFIRMED: otherOrderStatuses(OrderStatus.CONFIRMED),
   PREPARING: otherOrderStatuses(OrderStatus.PREPARING),
   SHIPPED: otherOrderStatuses(OrderStatus.SHIPPED),
   RECEIVED: otherOrderStatuses(OrderStatus.RECEIVED),
+  COMPLETED: [],
   CANCELLED: otherOrderStatuses(OrderStatus.CANCELLED),
 };
 
@@ -67,20 +75,27 @@ export function canTransition(from: OrderStatus, to: OrderStatus): boolean {
 
 /**
  * กลุ่ม "ถือของ" (ตัดสต็อกแล้ว) — เข้ากลุ่ม = ตัด FIFO (422 `STOCK_INSUFFICIENT`/`SOUVENIR_SUSPENDED` = ไม่เปลี่ยนอะไร) ·
- * ออกจากกลุ่ม (ไป `DRAFT`/`CANCELLED`) = คืนยอดที่ถืออยู่ทั้งหมด (net · idempotent) · ย้ายภายในกลุ่ม = ไม่แตะสต็อก
+ * ออกจากกลุ่ม (ไป `DRAFT`/`CANCELLED`) = คืนยอดที่ถืออยู่ทั้งหมด (net · idempotent) · ย้ายภายในกลุ่ม = ไม่แตะสต็อก · `COMPLETED` ถือของถาวร (ออกไม่ได้ · SV-ADR-149)
  */
 export const ORDER_STOCK_HELD_STATUSES: readonly OrderStatus[] = [
   OrderStatus.CONFIRMED,
   OrderStatus.PREPARING,
   OrderStatus.SHIPPED,
   OrderStatus.RECEIVED,
+  OrderStatus.COMPLETED,
 ];
 
 /** สถานะที่นับว่า "ออเดอร์เปิดอยู่" — กันลบสินค้าที่ถูกอ้างถึง (409 `SOUVENIR_IN_USE` details `openOrders`) · ยกเลิกออเดอร์จากรายการบริจาคได้ (`T-108`) */
 export const ORDER_OPEN_STATUSES: readonly OrderStatus[] = [OrderStatus.DRAFT, OrderStatus.CONFIRMED, OrderStatus.PREPARING];
 
 /**
- * สีต่อสถานะ (SV-ADR-075 · `T-111` · `REQ-SET-050`) — ตั้งค่าได้ในเมนู ตั้งค่า → ออเดอร์ (6 key หมวด `order` · `#RRGGBB` ตาม `SETTING_STRING_RULES`)
+ * สถานะที่ชื่อ/รหัสของที่ระลึกใน `order_items` **ตามเมนูของที่ระลึก** (write-through · SV-ADR-150 · `T-204`) — สถานะอื่น (`SHIPPED` `RECEIVED` `COMPLETED` `CANCELLED`)
+ * = snapshot ไม่เปลี่ยนตาม · ย้อนจาก snapshot กลับสถานะในกลุ่มนี้ = ดึงชื่อ/รหัสปัจจุบัน · migration `0055` เติมครั้งเดียวให้แถวที่เพี้ยน
+ */
+export const ORDER_ITEM_NAME_SYNC_STATUSES: readonly OrderStatus[] = [OrderStatus.DRAFT, OrderStatus.CONFIRMED, OrderStatus.PREPARING];
+
+/**
+ * สีต่อสถานะ (SV-ADR-075 · `T-111` · `REQ-SET-050`) — ตั้งค่าได้ในเมนู ตั้งค่า → ออเดอร์ (7 key หมวด `order` · `COMPLETED` = `0055` · `#RRGGBB` ตาม `SETTING_STRING_RULES`)
  * badge = จุดสี + พื้นสีจาง + ตัวอักษรสีปกติของธีม · แท็บที่เลือก = เส้นใต้ + ตัวเลขสีสถานะ · อ่านผ่าน `GET /orders/status-colors` (ค่าเสีย/ว่าง = ค่าเริ่มต้น)
  */
 export const ORDER_STATUS_COLOR_KEYS: Readonly<Record<OrderStatus, SettingKey>> = {
@@ -89,16 +104,18 @@ export const ORDER_STATUS_COLOR_KEYS: Readonly<Record<OrderStatus, SettingKey>> 
   PREPARING: SettingKey.ORDER_STATUS_COLOR_PREPARING,
   SHIPPED: SettingKey.ORDER_STATUS_COLOR_SHIPPED,
   RECEIVED: SettingKey.ORDER_STATUS_COLOR_RECEIVED,
+  COMPLETED: SettingKey.ORDER_STATUS_COLOR_COMPLETED,
   CANCELLED: SettingKey.ORDER_STATUS_COLOR_CANCELLED,
 };
 
-/** ค่าเริ่มต้น (= seed `0022`) — ใช้เมื่อแถวหาย/ค่าเสีย · หน้าเว็บที่ผู้ใช้ไม่มีสิทธิ์ออเดอร์ · ปุ่ม "คืนค่าเริ่มต้น" */
+/** ค่าเริ่มต้น (= seed `0022` · `COMPLETED` = `0055`) — ใช้เมื่อแถวหาย/ค่าเสีย · หน้าเว็บที่ผู้ใช้ไม่มีสิทธิ์ออเดอร์ · ปุ่ม "คืนค่าเริ่มต้น" */
 export const ORDER_STATUS_COLOR_DEFAULTS: Readonly<OrderStatusColors> = {
   DRAFT: '#64748B',
   CONFIRMED: '#2563EB',
   PREPARING: '#D97706',
   SHIPPED: '#7C3AED',
   RECEIVED: '#16A34A',
+  COMPLETED: '#065F46',
   CANCELLED: '#DC2626',
 };
 
@@ -131,6 +148,8 @@ export const ORDER_EDITABLE_SECTIONS: Readonly<Record<OrderStatus, readonly Orde
   PREPARING: [OrderEditSection.SHIPPING, OrderEditSection.NOTE],
   SHIPPED: [],
   RECEIVED: [],
+  /** ล็อกถาวร (SV-ADR-149) — ไม่มีทางย้อนกลับไปแก้ */
+  COMPLETED: [],
   CANCELLED: [],
 };
 
@@ -230,12 +249,13 @@ export interface OrderLabelPreset {
   heightMm: number;
 }
 
-/** 70×50 = ค่าเริ่มต้น (ฉลากยาร้านขายยาไทย · เครื่องพิมพ์ความร้อนทั่วไป) · 100×150 = ฉลากพัสดุขนส่ง */
+/** 70×50 = ค่าเริ่มต้น (ฉลากยาร้านขายยาไทย · เครื่องพิมพ์ความร้อนทั่วไป) · 80×60 = `SV-CR-021` #4 (`T-206`) · 100×150 = ฉลากพัสดุขนส่ง */
 export const ORDER_LABEL_PRESETS: readonly OrderLabelPreset[] = [
   { key: '50x30', widthMm: 50, heightMm: 30 },
   { key: '60x40', widthMm: 60, heightMm: 40 },
   { key: '70x50', widthMm: 70, heightMm: 50 },
   { key: '80x50', widthMm: 80, heightMm: 50 },
+  { key: '80x60', widthMm: 80, heightMm: 60 },
   { key: '100x75', widthMm: 100, heightMm: 75 },
   { key: '100x150', widthMm: 100, heightMm: 150 },
 ];
@@ -356,6 +376,8 @@ export interface OrderListItemView {
   shippedAt: string | null;
   /** เข้าสถานะรับสินค้าแล้ว — migration `0021` (`T-110`) */
   receivedAt: string | null;
+  /** เข้าสถานะเสร็จสิ้น (สุดท้ายถาวร) — migration `0055` (`T-202` · SV-ADR-149) */
+  completedAt: string | null;
   cancelledAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -475,7 +497,7 @@ export interface OrderLabelView {
   totalQty: number;
 }
 
-/** ออเดอร์ที่ถูกข้ามตอนพิมพ์ — `CANCELLED` (มีค่าครบ) · ไม่พบ/ถูกลบ = `orderNo`/`status` เป็น `null` (หน้าพิมพ์แสดง `#id`) */
+/** ออเดอร์ที่ถูกข้ามตอนพิมพ์ — `CANCELLED` / `COMPLETED` (มีค่าครบ · SV-ADR-149) · ไม่พบ/ถูกลบ = `orderNo`/`status` เป็น `null` (หน้าพิมพ์แสดง `#id`) */
 export interface OrderLabelSkipped {
   id: string;
   orderNo: string | null;

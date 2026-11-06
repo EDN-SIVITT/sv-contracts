@@ -267,6 +267,14 @@ export interface SouvenirView extends Omit<SouvenirListItemView, SouvenirListOnl
 }
 
 /**
+ * คำตอบของ `PATCH /souvenirs/:id` — สินค้าหลังแก้ + จำนวนออเดอร์ (ใบ) ที่ชื่อ/รหัสของในรายการเปลี่ยนตาม (SV-ADR-150 · `T-204`) ·
+ * sync เฉพาะออเดอร์สถานะ `ORDER_ITEM_NAME_SYNC_STATUSES` ที่ไม่ลบ · ไม่ได้แก้ชื่อ/รหัส หรือไม่มีออเดอร์ที่ยังไม่จัดส่ง = `0`
+ */
+export interface SouvenirUpdateResult extends SouvenirView {
+  orderItemsSynced: number;
+}
+
+/**
  * body ของ `POST /souvenirs` — `PATCH /souvenirs/:id` = `Partial` (ส่งเฉพาะช่องที่แก้ · `''` = ล้างค่าของช่องที่ไม่บังคับ)
  * ไม่มีช่องสต็อก — คงเหลือเป็นค่าอัตโนมัติจาก lot (CR ข้อ 1.2)
  */

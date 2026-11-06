@@ -177,11 +177,11 @@ export interface LiffDonorSummaryView {
   pendingCount: number;
   pendingAmount: string;
   years: { year: number; amount: string; count: number }[];
-  /** Σ จำนวนของในออเดอร์ที่ได้รับแล้ว */
+  /** Σ จำนวนของในออเดอร์ที่ได้รับแล้ว (`RECEIVED` + `COMPLETED`) */
   souvenirReceivedQty: number;
   /** ออเดอร์ `SHIPPED` (รอกดรับ) */
   ordersToReceive: number;
-  /** ออเดอร์ `RECEIVED` ที่ยังไม่มีคะแนน */
+  /** ออเดอร์ `RECEIVED` ที่ยังไม่มีคะแนน (`COMPLETED` ไม่นับ — ให้คะแนนไม่ได้แล้ว · SV-ADR-149) */
   ordersToRate: number;
   /** ออเดอร์ `DRAFT` · `CONFIRMED` · `PREPARING` · `SHIPPED` */
   ordersInProgress: number;
@@ -191,7 +191,7 @@ export interface LiffDonorSummaryView {
 
 /**
  * ความคืบหน้าของของที่ระลึกของรายการบริจาค (คำนวณที่ API) — `NONE` ไม่ได้ขอของ · `WAITING` ขอแล้ว ยังไม่ออกการจัดส่ง ·
- * `PREPARING` มีการจัดส่งที่ยังไม่ส่ง (DRAFT/CONFIRMED/PREPARING) · `SHIPPED` ส่งแล้วอย่างน้อย 1 และยังไม่ได้รับครบ · `RECEIVED` ได้รับครบทุกใบที่ไม่ยกเลิก ·
+ * `PREPARING` มีการจัดส่งที่ยังไม่ส่ง (DRAFT/CONFIRMED/PREPARING) · `SHIPPED` ส่งแล้วอย่างน้อย 1 และยังไม่ได้รับครบ · `RECEIVED` ได้รับครบทุกใบที่ไม่ยกเลิก (ใบ `COMPLETED` นับเป็นรับแล้ว · SV-ADR-149) ·
  * `CANCELLED` ทุกใบถูกยกเลิก
  */
 export const LiffSouvenirProgress = {
@@ -273,7 +273,7 @@ export interface LiffOrderRatingView {
   updatedAt: string;
 }
 
-/** ออเดอร์ทั้งหมดของผู้บริจาค (ทุกที่มา · ไม่รวมที่ลบ) — เรียง: SHIPPED → DRAFT/CONFIRMED/PREPARING → RECEIVED/CANCELLED แล้ว `created_at` ใหม่ → เก่า */
+/** ออเดอร์ทั้งหมดของผู้บริจาค (ทุกที่มา · ไม่รวมที่ลบ) — เรียง: SHIPPED → DRAFT/CONFIRMED/PREPARING → RECEIVED/COMPLETED/CANCELLED แล้ว `created_at` ใหม่ → เก่า */
 export interface LiffOrderListItem {
   id: string;
   orderNo: string;
@@ -285,6 +285,8 @@ export interface LiffOrderListItem {
   preparingAt: string | null;
   shippedAt: string | null;
   receivedAt: string | null;
+  /** เข้าสถานะเสร็จสิ้น (`0055` · SV-ADR-149) */
+  completedAt: string | null;
   cancelledAt: string | null;
   shippingCarrier: string | null;
   trackingNo: string | null;
@@ -301,7 +303,7 @@ export interface LiffOrderDetailView extends LiffOrderListItem {
   siblings: { id: string; orderNo: string; status: OrderStatus; splitNo: number | null }[];
 }
 
-/** body ของ `PUT …/donor/orders/:id/rating` — `RECEIVED` เท่านั้น (อื่น 409 `ORDER_RATING_NOT_ALLOWED`) · ส่งซ้ำ = แก้คะแนนเดิม · `comment` `''`/`null` = ไม่มี */
+/** body ของ `PUT …/donor/orders/:id/rating` — `RECEIVED` เท่านั้น (อื่น รวม `COMPLETED` ที่คะแนนถูกล็อก = 409 `ORDER_RATING_NOT_ALLOWED` `{ status }`) · ส่งซ้ำ = แก้คะแนนเดิม · `comment` `''`/`null` = ไม่มี */
 export interface OrderRatingInput {
   rating: number;
   comment?: string | null;

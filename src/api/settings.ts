@@ -149,6 +149,8 @@ export const SettingKey = {
   ORDER_STATUS_COLOR_PREPARING: 'order.statusColorPreparing',
   ORDER_STATUS_COLOR_SHIPPED: 'order.statusColorShipped',
   ORDER_STATUS_COLOR_RECEIVED: 'order.statusColorReceived',
+  /** สีสถานะ "เสร็จสิ้น" — `0055` · SV-ADR-149 · `T-202` · ค่าเริ่มต้น `#065F46` (ไม่ใช้ `#0F766E` = สีเลขที่รายการบริจาค · SV-ADR-078) */
+  ORDER_STATUS_COLOR_COMPLETED: 'order.statusColorCompleted',
   ORDER_STATUS_COLOR_CANCELLED: 'order.statusColorCancelled',
   /**
    * สีเลขที่ออเดอร์ `#RRGGBB` (บังคับ) — `REQ-SET-051` · SV-ADR-078 · `T-115` · คู่กับ `DONATION_NO_COLOR` ให้ผู้ใช้แยก 2 ชนิดเลขที่ด้วยสี ·
@@ -383,6 +385,7 @@ export const SETTING_STRING_RULES: Readonly<Record<string, SettingStringRule>> =
   [SettingKey.ORDER_STATUS_COLOR_PREPARING]: HEX_COLOR_RULE,
   [SettingKey.ORDER_STATUS_COLOR_SHIPPED]: HEX_COLOR_RULE,
   [SettingKey.ORDER_STATUS_COLOR_RECEIVED]: HEX_COLOR_RULE,
+  [SettingKey.ORDER_STATUS_COLOR_COMPLETED]: HEX_COLOR_RULE,
   [SettingKey.ORDER_STATUS_COLOR_CANCELLED]: HEX_COLOR_RULE,
   // SV-ADR-078 — สีเลขที่ออเดอร์ / รายการบริจาค (ค่าเสียที่แก้ตรง DB → `GET /…/ref-no-colors` ใช้ค่าเริ่มต้น)
   [SettingKey.ORDER_NO_COLOR]: HEX_COLOR_RULE,

@@ -142,11 +142,11 @@ export const ErrorCode = {
   SOUVENIR_IMAGE_ORDER_INVALID: 'SOUVENIR_IMAGE_ORDER_INVALID',
   /** สต็อกไม่พอ — ปรับยอด lot ติดลบ หรือยืนยันออเดอร์แล้ว lot รวมไม่พอ (rollback ทั้ง transaction) — 422 `details { souvenirId, code, name, requested, available }` */
   STOCK_INSUFFICIENT: 'STOCK_INSUFFICIENT',
-  /** เปลี่ยนสถานะออเดอร์ไม่ตรง `ORDER_STATUS_TRANSITIONS` (ไปสถานะเดิม) · ยกเลิกจากรายการบริจาคเมื่อออเดอร์ไม่อยู่ใน `ORDER_OPEN_STATUSES` — 409 `details { from, to }` */
+  /** เปลี่ยนสถานะออเดอร์ไม่ตรง `ORDER_STATUS_TRANSITIONS` (ไปสถานะเดิม · ออกจาก `COMPLETED` · เข้า `COMPLETED` จากที่ไม่ใช่ SHIPPED/RECEIVED) · ยกเลิกจากรายการบริจาคเมื่อออเดอร์ไม่อยู่ใน `ORDER_OPEN_STATUSES` — 409 `details { from, to }` */
   ORDER_STATUS_INVALID: 'ORDER_STATUS_INVALID',
   /**
    * แก้/ลบออเดอร์ในสถานะที่ไม่อนุญาต (SV-ADR-074) — ส่งช่องของส่วนที่ล็อก (`ORDER_EDITABLE_SECTIONS`) → 409 `details { status, section }` ·
-   * สถานะที่ไม่มีส่วนแก้ได้ (SHIPPED/RECEIVED/CANCELLED) · ลบที่ไม่ใช่ DRAFT → 409 `details { status }`
+   * สถานะที่ไม่มีส่วนแก้ได้ (SHIPPED/RECEIVED/COMPLETED/CANCELLED) · ลบที่ไม่ใช่ DRAFT → 409 `details { status }`
    */
   ORDER_NOT_EDITABLE: 'ORDER_NOT_EDITABLE',
   /**
@@ -283,7 +283,7 @@ export const ErrorCode = {
   DONATION_RECIPIENT_ADDRESS_REQUIRED: 'DONATION_RECIPIENT_ADDRESS_REQUIRED',
   /** แจ้งบริจาคจาก LINE OA: ของที่เลือกพร้อมส่งไม่พอในบริบทนั้น (คงเหลือ/โควตาแคมเปญ) — 422 `details { souvenirId, name, requested, available }` (CMS ไม่ใช้กฎนี้) */
   DONATION_SOUVENIR_OUT_OF_STOCK: 'DONATION_SOUVENIR_OUT_OF_STOCK',
-  /** ให้คะแนนออเดอร์ที่ยังไม่ "รับสินค้าแล้ว" — 409 `details { status }` */
+  /** ให้/แก้คะแนนออเดอร์ที่ไม่อยู่ในสถานะ "รับสินค้าแล้ว" (ยังไม่รับ · หรือ `COMPLETED` = คะแนนถูกล็อก · SV-ADR-149) — 409 `details { status }` */
   ORDER_RATING_NOT_ALLOWED: 'ORDER_RATING_NOT_ALLOWED',
   // ── ลิงก์แชร์รายการให้ผู้บริจาค (`SV-CR-016` §7 · SV-ADR-125 · `T-177`) — เปิดลิงก์ไม่พบ/ไม่ใช่เจ้าของ = `NOT_FOUND` เดียวกัน ──
   /** ผู้บริจาคของรายการยังไม่ผูกบัญชี LINE (หรือถูกลบ) — สร้างลิงก์ไม่ได้ 422 `details { donorId }` */

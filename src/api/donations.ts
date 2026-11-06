@@ -590,7 +590,7 @@ export interface DonationCreateOrderInput {
 
 /**
  * body ของ `POST /donations/:id/cancel-order` (`T-108` · `T-113`) — สิทธิ์เหมือน `/order` · ต้อง `ORDERED` (อื่น 409 `DONATION_STATUS_INVALID`) ·
- * ยกเลิก**ทุกใบ active** — ทุกใบต้องอยู่ใน `ORDER_OPEN_STATUSES` (`DRAFT`/`CONFIRMED`/`PREPARING` · มีใบ `SHIPPED`/`RECEIVED` → 409 `ORDER_STATUS_INVALID`
+ * ยกเลิก**ทุกใบ active** — ทุกใบต้องอยู่ใน `ORDER_OPEN_STATUSES` (`DRAFT`/`CONFIRMED`/`PREPARING` · มีใบ `SHIPPED`/`RECEIVED`/`COMPLETED` → 409 `ORDER_STATUS_INVALID`
  * `{ from, to, orderId, orderNo }` ไม่แตะใบไหน) → ยกเลิก (คืนสต็อกถ้าถืออยู่ · `cancelReason` = เหตุผลนี้) + รายการกลับ `CONFIRMED` ใน transaction เดียว ·
  * ออเดอร์เดิมยังอ้างอิงรายการนี้ (ประวัติ) · ออกออเดอร์ใหม่ได้ · response = `DonationView`
  */

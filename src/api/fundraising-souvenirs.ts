@@ -182,7 +182,7 @@ export interface CampaignAllocationView {
   used: number;
   /** ออเดอร์ `CONFIRMED` + `PREPARING` (รอจัดส่ง) */
   usedPending: number;
-  /** ออเดอร์ `SHIPPED` + `RECEIVED` (จัดส่งแล้ว) */
+  /** ออเดอร์ `SHIPPED` + `RECEIVED` + `COMPLETED` (จัดส่งแล้ว · SV-ADR-149) */
   usedShipped: number;
   /** ในออเดอร์ `DRAFT` ของแคมเปญ (จองอยู่ · ยังไม่ตัด · ไม่กินโควตา) */
   draft: number;

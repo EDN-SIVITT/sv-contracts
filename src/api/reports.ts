@@ -740,6 +740,8 @@ export interface ShippingReportDetailRow {
   confirmedAt: string | null;
   shippedAt: string | null;
   receivedAt: string | null;
+  /** เข้าสถานะเสร็จสิ้น (`0055` · SV-ADR-149) */
+  completedAt: string | null;
   cancelledAt: string | null;
   /** ชื่อขนส่ง snapshot (`shipping_carrier`) */
   carrierName: string | null;
@@ -767,10 +769,10 @@ export type ShippingReportExportView = ShippingReportView & { export: ReportExpo
 // ── R5 การแจกของที่ระลึก (`/reports/distribution` · `T-140`) ───────────────────────────────────
 
 /**
- * ฐานของ R5: บรรทัด `order_items` ของออเดอร์สถานะ `SHIPPED`/`RECEIVED` ที่ `shipped_at` อยู่ในช่วง (แจกถึงมือ = ส่งออกไปแล้ว · ไม่ใช่ ISSUE ตอนยืนยัน — SV-ADR-095) ·
+ * ฐานของ R5: บรรทัด `order_items` ของออเดอร์สถานะ `SHIPPED`/`RECEIVED`/`COMPLETED` (SV-ADR-149) ที่ `shipped_at` อยู่ในช่วง (แจกถึงมือ = ส่งออกไปแล้ว · ไม่ใช่ ISSUE ตอนยืนยัน — SV-ADR-095) ·
  * มูลค่า = `qty × order_items.unit_value` (snapshot ตอนสร้าง/แก้ร่าง) รวมใน DB · กองทุน/แคมเปญ = ของรายการบริจาคต้นทาง (`source_donation_id`) · ไม่มีต้นทาง = "ไม่ระบุ"
  */
-export const DISTRIBUTION_REPORT_STATUSES: readonly OrderStatus[] = [OrderStatus.SHIPPED, OrderStatus.RECEIVED];
+export const DISTRIBUTION_REPORT_STATUSES: readonly OrderStatus[] = [OrderStatus.SHIPPED, OrderStatus.RECEIVED, OrderStatus.COMPLETED];
 
 export const DistributionReportGroupBy = {
   SOUVENIR: 'SOUVENIR',
