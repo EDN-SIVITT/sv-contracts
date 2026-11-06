@@ -140,6 +140,13 @@ export const ErrorCode = {
   SOUVENIR_IMAGES_LIMIT: 'SOUVENIR_IMAGES_LIMIT',
   /** ลำดับรูปที่ส่งมาไม่ใช่ชุด id ครบของสินค้านี้ (ขาด · เกิน · ซ้ำ · ของสินค้าอื่น) — 422 `details { field: 'imageIds', reason }` (`T-100`) */
   SOUVENIR_IMAGE_ORDER_INVALID: 'SOUVENIR_IMAGE_ORDER_INVALID',
+  // ── หน่วยนับของที่ระลึก (`T-209` · SV-ADR-154 · REQ-SVN-020 · ตั้งค่า → ของที่ระลึก) ──
+  /** ชื่อหน่วยนับซ้ำกับแถวที่ยังไม่ลบ (ไม่สนตัวพิมพ์) — 409 `details { field: 'name', name }` */
+  SOUVENIR_UNIT_NAME_TAKEN: 'SOUVENIR_UNIT_NAME_TAKEN',
+  /** ตั้งชื่อหน่วยนับเป็นค่าเริ่มต้นในตัว ("ชิ้น"/"pcs" — `SOUVENIR_UNIT_RESERVED_NAMES`) — 409 `details { field: 'name', name }` */
+  SOUVENIR_UNIT_RESERVED: 'SOUVENIR_UNIT_RESERVED',
+  /** ลบหน่วยนับที่ยังมีของที่ระลึก (ที่ยังไม่ลบ) ใช้อยู่ — 409 `details { count }` · ให้ปิดใช้งานแทน */
+  SOUVENIR_UNIT_IN_USE: 'SOUVENIR_UNIT_IN_USE',
   /** สต็อกไม่พอ — ปรับยอด lot ติดลบ หรือยืนยันออเดอร์แล้ว lot รวมไม่พอ (rollback ทั้ง transaction) — 422 `details { souvenirId, code, name, requested, available }` */
   STOCK_INSUFFICIENT: 'STOCK_INSUFFICIENT',
   /** เปลี่ยนสถานะออเดอร์ไม่ตรง `ORDER_STATUS_TRANSITIONS` (ไปสถานะเดิม · ออกจาก `COMPLETED` · เข้า `COMPLETED` จากที่ไม่ใช่ SHIPPED/RECEIVED) · ยกเลิกจากรายการบริจาคเมื่อออเดอร์ไม่อยู่ใน `ORDER_OPEN_STATUSES` — 409 `details { from, to }` */

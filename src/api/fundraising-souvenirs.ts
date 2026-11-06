@@ -1,4 +1,6 @@
 import type { DonationActorView } from './donations';
+import type { OrderStatus } from './orders';
+import type { ApiMeta } from './response';
 import type { SouvenirStatus } from './souvenirs';
 
 /**
@@ -402,6 +404,7 @@ export interface SouvenirCampaignUsageView {
 // - `DELETE /campaigns/:id/souvenirs/:souvenirId` → `CampaignSouvenirsView` (คืนที่จองเหลือ · แถวจัดสรรที่ใช้แล้วคงไว้เป็นประวัติ)
 // - `PATCH /campaigns/:id/souvenir-mode` `CampaignSouvenirModeInput` → `CampaignSouvenirsView`
 // - `GET /campaigns/:id/souvenirs/history?souvenirId=&page=&perPage=` → `CampaignSouvenirHistoryEntry[]` + meta (เหตุการณ์ + ledger จอง เรียงเวลาใหม่ก่อน)
+// - `GET /campaigns/:id/souvenirs/:souvenirId/ledger?kind=&page=&perPage=` → `CampaignStockLedgerView` (สมุดสต็อกแคมเปญ · `SV-CR-022` §1 · `T-207` · SV-ADR-153)
 
 /** ชนิดเหตุการณ์ของ `campaign_souvenir_events` — `MODE` = สลับ "แจกของที่ระลึก" (ไม่มีของ · `souvenir = null`) */
 export const CampaignSouvenirEventType = {
@@ -489,15 +492,24 @@ export interface CampaignSouvenirsAddInput {
  * transaction เดียว (ล็อก ของ X → แคมเปญ S → แถว X → แถวจัดสรร X แบบ `issueForOrder`): `stockMode = CENTRAL` → คืนที่จองเหลือ (ledger `RELEASE`) ·
  * `RESERVED` + `reservedQty` → ตั้งยอดจองรวม (ledger `ALLOCATE`/`INCREASE`/`DECREASE` · ส่วนที่เกิน free = `preorder_qty` · จองเกินคงเหลือได้เสมอ = pre-order) ·
  * `reservedQty` < used → 422 `CAMPAIGN_ALLOCATION_BELOW_USED { souvenirId, allocated, used, requested }` ·
- * ส่ง `reservedQty` แต่ผลเป็น `CENTRAL` → 422 `{ field: 'reservedQty', reason: 'NOT_RESERVED' }` · เปลี่ยน `stockMode`/`reservedQty` ไม่มีสิทธิ์ souvenirs MAINTAIN → 403
+ * ส่ง `reservedQty` แต่ผลเป็น `CENTRAL` → 422 `{ field: 'reservedQty', reason: 'NOT_RESERVED' }` · เปลี่ยน `stockMode`/`reservedQty`/`reservedDelta` ไม่มีสิทธิ์ souvenirs MAINTAIN → 403 ·
+ * `reservedDelta` (`SV-CR-022` · `T-207`) = ปรับ ± "คงเหลือในแคมเปญ" ใต้ล็อกเดียวกัน — ส่งคู่ `reservedQty` → 422 `{ field: 'reservedDelta', reason: 'CONFLICT' }` ·
+ * ผลเป็น `CENTRAL` → 422 `{ field: 'reservedDelta', reason: 'NOT_RESERVED' }` · สลับ CENTRAL → RESERVED พร้อม +n ได้ในคำขอเดียว
  */
 export interface CampaignSouvenirUpdateInput {
   /** กติกาเดียวกับเกณฑ์ของของ (0 – `SOUVENIR_VALUE_MAX` · ทศนิยม ≤ 2) */
   minAmount?: string | number;
   status?: CampaignSouvenirStatus;
   stockMode?: CampaignSouvenirStockMode;
-  /** ยอดจองรวม (รวมที่ใช้แล้ว) จำนวนเต็ม 0…`CAMPAIGN_ALLOCATION_QTY_MAX` */
+  /** ยอดจองรวม (รวมที่ใช้แล้ว) จำนวนเต็ม 0…`CAMPAIGN_ALLOCATION_QTY_MAX` — คงไว้เพื่อความเข้ากันได้ (เว็บใหม่ส่ง `reservedDelta`) */
   reservedQty?: number;
+  /**
+   * ปรับยอดจอง ± (จำนวนเต็ม ≠ 0 · |n| ≤ `CAMPAIGN_ALLOCATION_QTY_MAX` · ผิด → 400) — คิดต่อ "คงเหลือในแคมเปญ" (`reservedRemaining`):
+   * `+n` = รับเข้าจากส่วนกลาง: ยอดจองรวม := max(reserved, used) + n → คงเหลือในแคมเปญ +n พอดี (ledger `ALLOCATE`/`INCREASE` · ส่วนที่เกิน max(0, free) = `preorder_qty` · จองเกินคงเหลือได้ = pre-order) ·
+   * `−n` = คืนส่วนกลาง: n ≤ `reservedRemaining` ไม่งั้น 422 `CAMPAIGN_ALLOCATION_RELEASE_EXCEEDS { souvenirId, remaining, requested, allocated, used }` (ledger `DECREASE`) ·
+   * ยอดจองรวมหลังปรับเกิน `CAMPAIGN_ALLOCATION_QTY_MAX` → 422 `{ field: 'reservedDelta', reason: 'TOO_LARGE', max }`
+   */
+  reservedDelta?: number;
   /** หมายเหตุของ ledger ≤ `CAMPAIGN_ALLOCATION_NOTE_MAX_LENGTH` */
   note?: string | null;
 }
@@ -543,3 +555,104 @@ export interface CampaignSouvenirMovementEntry extends Omit<CampaignAllocationMo
 
 /** ประวัติรวม — ใหม่สุดก่อน (`createdAt DESC` · เวลาเท่ากัน = เหตุการณ์ก่อน ledger) */
 export type CampaignSouvenirHistoryEntry = CampaignSouvenirEventEntry | CampaignSouvenirMovementEntry;
+
+// ── สมุดสต็อกแคมเปญ (`SV-CR-022` §1 · `T-207` · SV-ADR-153 · FT-18 `REQ-FND-024`) ─────────────────────────────────────────────
+//
+// มุมมองจาก ledger ที่มีอยู่ (ไม่มีตารางใหม่) ต่อ (แคมเปญ c, ของ s): (ก) `campaign_stock_allocation_movements` (ส่วนกลาง ↔ แคมเปญ) ·
+// (ข) `souvenir_stock_movements` `ISSUE`/`RETURN` ที่ `ref_type` ∈ `ORDER_STOCK_REF_TYPES` ของออเดอร์ที่ `orders.source_donation_id → donations.campaign_id = c`
+// (= นิยาม `used` — ตัดตอนเข้ากลุ่มถือของ · คืนตอนออก) · หลายแถว (หลาย lot) ของออเดอร์เดียวที่ติดกันในชนิดเดียวกัน = 1 รายการ ·
+// เดินจากเก่า → ใหม่: allocated := `qty_after` · used ± จำนวน · remaining = max(0, allocated − used) — ตัดให้ออเดอร์ n: จากที่จอง = remBefore − remAfter · ที่เหลือ = จากส่วนกลางตรง ·
+// ออเดอร์คืน n: เข้าที่จอง = remAfter − remBefore · ที่เหลือ = กลับส่วนกลาง → "คงเหลือในแคมเปญ" ไม่ติดลบ · ยอดสุดท้าย ≠ `reservedRemaining` สด (ข้อมูลก่อนมีระบบ ฯลฯ) = `consistent: false`
+
+/** ชนิดรายการในสมุด — RESERVE_* = ledger (ก) · ORDER_* = ledger (ข) */
+export const CampaignStockLedgerKind = {
+  /** รับเข้าจากส่วนกลาง (`ALLOCATE` / `INCREASE`) */
+  RESERVE_IN: 'RESERVE_IN',
+  /** คืนส่วนกลาง (`DECREASE` / `RELEASE`) */
+  RESERVE_OUT: 'RESERVE_OUT',
+  /** ตัดให้ออเดอร์ (`ISSUE`) */
+  ORDER_ISSUE: 'ORDER_ISSUE',
+  /** ออเดอร์คืนของ (`RETURN`) */
+  ORDER_RETURN: 'ORDER_RETURN',
+} as const;
+export type CampaignStockLedgerKind = (typeof CampaignStockLedgerKind)[keyof typeof CampaignStockLedgerKind];
+
+/** ตัวกรอง `kind` ของสมุด — ไม่ส่ง = ทั้งหมด */
+export const CampaignStockLedgerFilter = {
+  /** RESERVE_IN + RESERVE_OUT */
+  RESERVE: 'RESERVE',
+  /** ORDER_ISSUE + ORDER_RETURN */
+  ORDER: 'ORDER',
+} as const;
+export type CampaignStockLedgerFilter = (typeof CampaignStockLedgerFilter)[keyof typeof CampaignStockLedgerFilter];
+
+/** query ของ `GET /campaigns/:id/souvenirs/:souvenirId/ledger` — `page` / `perPage` แบบ list อื่น */
+export interface CampaignStockLedgerQuery {
+  kind?: CampaignStockLedgerFilter;
+  page?: number;
+  perPage?: number;
+}
+
+/** ออเดอร์ของรายการ ORDER_* (ณ ปัจจุบัน) — `deleted` = ถูกลบ (soft) */
+export interface CampaignStockLedgerOrderRef {
+  id: string;
+  /** `orders.order_no` */
+  orderNo: string;
+  status: OrderStatus;
+  deleted: boolean;
+}
+
+/** 1 รายการของสมุด (ใหม่สุดก่อน) — จำนวนเป็นชิ้น */
+export interface CampaignStockLedgerEntry {
+  /** `a<id>` = ledger (ก) · `s<id>` = movement (ข) แถวแรกของกลุ่ม */
+  id: string;
+  kind: CampaignStockLedgerKind;
+  /** ชนิดของ ledger (ก) · ORDER_* = `null` */
+  movementType: CampaignAllocationMovementType | null;
+  /** จำนวนของรายการ (บวก) — RESERVE_*: |ยอดจองรวมที่เปลี่ยน| (ledger `qty`) · ORDER_*: ชิ้นของออเดอร์ครั้งนั้น (รวมทุก lot) */
+  qty: number;
+  /** ± ต่อ "คงเหลือในแคมเปญ" (= balanceAfter − ก่อนหน้า) — ORDER_ISSUE: −(จากที่จอง) · ORDER_RETURN: +(เข้าที่จอง) */
+  reservedDelta: number;
+  /** ส่วนที่มาจาก/กลับส่วนกลางตรง (≥ 0) — RESERVE_*: = |reservedDelta| · ORDER_ISSUE: qty − จากที่จอง · ORDER_RETURN: qty − เข้าที่จอง */
+  centralQty: number;
+  /** คงเหลือในแคมเปญหลังรายการนี้ = max(0, reservedAfter − used ณ ตอนนั้น) */
+  balanceAfter: number;
+  /** ยอดจองรวมหลังรายการนี้ (ledger `qty_after` ล่าสุด) */
+  reservedAfter: number;
+  /** Pre-order ของ ledger (ก) (`preorder_qty`) · อื่น = 0 */
+  preorderQty: number;
+  /** RESERVE_* = `null` */
+  order: CampaignStockLedgerOrderRef | null;
+  actor: DonationActorView | null;
+  /** หมายเหตุของ ledger (ก) · ORDER_* = `null` (เลขที่ออเดอร์อยู่ใน `order`) */
+  note: string | null;
+  /** ISO */
+  createdAt: string;
+}
+
+/** ผลรวมทั้งสมุด (ไม่ขึ้นกับตัวกรอง) — Σ `qty` ตามชนิด */
+export interface CampaignStockLedgerTotals {
+  reservedIn: number;
+  reservedOut: number;
+  issued: number;
+  returned: number;
+}
+
+/**
+ * `GET /campaigns/:id/souvenirs/:souvenirId/ledger?kind=RESERVE|ORDER&page=&perPage=` (campaigns READ_ONLY) — แคมเปญไม่พบ/ถูกลบ หรือของไม่มีอยู่ = 404 ·
+ * ของถูกลบ (soft) / ไม่อยู่ใน list ของแคมเปญแล้ว = ยังดูได้ (`souvenir.deleted` · `stockMode = null`) · ไม่มีรายการ = `data` ว่าง ·
+ * response ระดับเดียวกับ `data`/`meta` (เว็บ: `apiFetchList<CampaignStockLedgerEntry, ApiMeta, Omit<CampaignStockLedgerView, 'data' | 'meta'>>`)
+ */
+export interface CampaignStockLedgerView {
+  campaignId: string;
+  souvenir: CampaignSouvenirRef;
+  /** ชนิดสต็อกของแถวในแคมเปญ · ไม่อยู่ใน list ของแคมเปญ = `null` */
+  stockMode: CampaignSouvenirStockMode | null;
+  /** สต็อกสด (นิยามเดียวกับ `CampaignSouvenirItemView.stock` · ไม่มีแถวกฎ = คิดแบบ CENTRAL) */
+  stock: CampaignSouvenirStockView;
+  totals: CampaignStockLedgerTotals;
+  /** ยอด "คงเหลือในแคมเปญ" สุดท้ายที่เดินได้ = `stock.reservedRemaining` */
+  consistent: boolean;
+  data: CampaignStockLedgerEntry[];
+  meta: ApiMeta;
+}

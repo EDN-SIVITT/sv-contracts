@@ -21,6 +21,7 @@ export * from './api/donor-groups';
 export * from './api/share-links';
 export * from './api/sequence-code';
 export * from './api/souvenirs';
+export * from './api/souvenir-units';
 export * from './api/orders';
 export * from './api/shipping-carriers';
 export * from './api/money';
