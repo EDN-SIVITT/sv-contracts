@@ -35,6 +35,11 @@ export const PermissionSubject = {
   DONOR_GROUPS: 'donor_groups',
   /** ช่องทางติดต่อ (e-Donation · กลุ่มเมนู "จัดการเนื้อหา") — READ_ONLY ดู · MAINTAIN เพิ่ม/แก้/จัดลำดับ/ไอคอน/แสดง-ซ่อน · FULL ลบ (soft) (`REQ-CNT-*` · `SV-CR-009` ข้อ 3 · SV-ADR-094) */
   CONTACT_CHANNELS: 'contact_channels',
+  /**
+   * นโยบายความเป็นส่วนตัว + ข้อกำหนดการใช้งาน (e-Donation · กลุ่มเมนู "จัดการเนื้อหา" · 2 เมนูย่อยใช้สิทธิ์นี้ร่วมกัน — `SV-CR-024` §2 · SV-ADR-160) —
+   * READ_ONLY ดู · MAINTAIN เพิ่ม/แก้**ฉบับร่าง** · FULL เผยแพร่ + แก้เวอร์ชันที่เผยแพร่อยู่ (หน้าสาธารณะเปลี่ยนทันที) (`REQ-LGL-*`)
+   */
+  LEGAL_DOCUMENTS: 'legal_documents',
   SYSTEM_USERS: 'system_users',
   USER_GROUPS: 'user_groups',
   AUDIT_LOGS: 'audit_logs',

@@ -29,6 +29,7 @@ export * from './api/donations';
 export * from './api/fundraising';
 export * from './api/fundraising-souvenirs';
 export * from './api/contact-channels';
+export * from './api/legal-documents';
 export * from './api/ref-no-colors';
 export * from './api/liff';
 export * from './api/liff-donor';

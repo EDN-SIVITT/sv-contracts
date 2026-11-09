@@ -301,6 +301,14 @@ export const ErrorCode = {
   SHARE_LINK_NOT_FOUND: 'SHARE_LINK_NOT_FOUND',
   /** สุ่ม code ชนกันเกิน 5 ครั้งติด (แทบเป็นไปไม่ได้) — 409 ลองใหม่ได้ */
   SHARE_LINK_CODE_CONFLICT: 'SHARE_LINK_CODE_CONFLICT',
+  /** เอกสารนโยบาย/ข้อกำหนด (`SV-CR-024` §2 · `T-219`) — ไม่มีเวอร์ชันนี้ในชนิดนี้ / ชนิดไม่รู้จัก = 404 `details { id }` */
+  LEGAL_DOCUMENT_NOT_FOUND: 'LEGAL_DOCUMENT_NOT_FOUND',
+  /** เลขเวอร์ชันซ้ำกับเวอร์ชันอื่นของเอกสารชนิดเดียวกัน (ไม่สนตัวพิมพ์) — 409 `details { field: 'version', value }` */
+  LEGAL_DOCUMENT_VERSION_TAKEN: 'LEGAL_DOCUMENT_VERSION_TAKEN',
+  /** มีคนแก้เวอร์ชันนี้คั่นกลาง (`expectedUpdatedAt` ไม่ตรง) — 409 · หน้าเว็บโหลดค่าล่าสุดให้ตรวจก่อนบันทึกใหม่ */
+  LEGAL_DOCUMENT_STALE: 'LEGAL_DOCUMENT_STALE',
+  /** แก้เวอร์ชันที่เผยแพร่อยู่ต้องมีสิทธิ์ FULL (หน้าสาธารณะเปลี่ยนทันที · SV-ADR-160) — 403 */
+  LEGAL_DOCUMENT_PUBLISHED_LOCKED: 'LEGAL_DOCUMENT_PUBLISHED_LOCKED',
   /** ใช้กับ validation error ทั่วไปที่ไม่มี code เฉพาะ */
   VALIDATION_FAILED: 'VALIDATION_FAILED',
   NOT_FOUND: 'NOT_FOUND',
