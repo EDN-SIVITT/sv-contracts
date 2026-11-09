@@ -217,6 +217,11 @@ export const SettingKey = {
   LIFF_LANGUAGE_SWITCHER_ENABLED: 'liff.languageSwitcherEnabled',
   /** ภาษาหลักของหน้า LINE OA `th`/`en` (บังคับ · ค่าอื่น 422) — เปิดปุ่ม = ภาษาเริ่มต้นก่อนผู้บริจาคเลือกเอง · ปิดปุ่ม = ภาษาที่ใช้เสมอ · ค่าเริ่มต้น `th` */
   LIFF_DEFAULT_LOCALE: 'liff.defaultLocale',
+  /**
+   * แสดงแถบเมนูล่าง 4 ปุ่ม (บัญชีของฉัน · แจ้งบริจาค · ของที่ระลึก · ติดต่อเรา) บนหน้า LINE OA — **ค่าเริ่มต้น `false` (ไม่แสดง)** ·
+   * ปิด = ผู้บริจาคสลับหน้าผ่าน rich menu ของ LINE OA (LIFF URL 4 เมนู) · `SV-CR-023` §1 · SV-ADR-155 · `0057`
+   */
+  LIFF_BOTTOM_NAV_ENABLED: 'liff.bottomNavEnabled',
 } as const;
 export type SettingKey = (typeof SettingKey)[keyof typeof SettingKey];
 

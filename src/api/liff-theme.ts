@@ -66,11 +66,15 @@ export interface LiffThemeImageSummary {
 /** ค่าเริ่มต้น (ไม่มีแถว · ค่าเสีย) — ต้องตรงกับ `0046` */
 export const LIFF_LANGUAGE_SWITCHER_DEFAULT_ENABLED = true;
 export const LIFF_DEFAULT_LOCALE: LiffLocale = 'th';
+/** แถบเมนูล่างของหน้า LINE OA — ค่าเริ่มต้น **ปิด** (ไม่มีแถว · ค่าเสีย) · ต้องตรงกับ `0057` (`SV-CR-023` §1 · SV-ADR-155) */
+export const LIFF_BOTTOM_NAV_DEFAULT_ENABLED = false;
 
 /** `BrandingView.liff` (`GET /branding` · public · ไม่มีข้อมูลลับ) — ไม่มีแถว/ค่าเสีย = ค่าเริ่มต้น (หน้าตาเดิม) */
 export interface BrandingLiffView {
   languageSwitcherEnabled: boolean;
   defaultLocale: LiffLocale;
+  /** แสดงแถบเมนูล่าง 4 ปุ่ม (`liff.bottomNavEnabled` · ค่าเริ่มต้นปิด) */
+  bottomNavEnabled: boolean;
   profileCover: { version: string } | null;
   pageBackground: { version: string } | null;
 }
@@ -78,6 +82,7 @@ export interface BrandingLiffView {
 export const BRANDING_LIFF_DEFAULTS: BrandingLiffView = {
   languageSwitcherEnabled: LIFF_LANGUAGE_SWITCHER_DEFAULT_ENABLED,
   defaultLocale: LIFF_DEFAULT_LOCALE,
+  bottomNavEnabled: LIFF_BOTTOM_NAV_DEFAULT_ENABLED,
   profileCover: null,
   pageBackground: null,
 };
@@ -96,6 +101,11 @@ export function readLiffLanguageSwitcherEnabled(raw: unknown): boolean {
   return typeof raw === 'boolean' ? raw : LIFF_LANGUAGE_SWITCHER_DEFAULT_ENABLED;
 }
 
+/** `liff.bottomNavEnabled` — ไม่ใช่ boolean (ไม่มีแถว · ค่าเสีย) = ปิด (ค่าเริ่มต้นของ `SV-CR-023`) */
+export function readLiffBottomNavEnabled(raw: unknown): boolean {
+  return typeof raw === 'boolean' ? raw : LIFF_BOTTOM_NAV_DEFAULT_ENABLED;
+}
+
 /** อ่าน `BrandingView.liff` แบบระวัง (API รุ่นเก่าไม่ส่ง · ค่าเสีย) — เว็บใช้ตัวนี้ตัวเดียว */
 export function readBrandingLiff(raw: unknown): BrandingLiffView {
   if (typeof raw !== 'object' || raw === null) return BRANDING_LIFF_DEFAULTS;
@@ -107,6 +117,7 @@ export function readBrandingLiff(raw: unknown): BrandingLiffView {
   return {
     languageSwitcherEnabled: readLiffLanguageSwitcherEnabled(value.languageSwitcherEnabled),
     defaultLocale: readLiffDefaultLocale(value.defaultLocale),
+    bottomNavEnabled: readLiffBottomNavEnabled(value.bottomNavEnabled),
     profileCover: image(value.profileCover),
     pageBackground: image(value.pageBackground),
   };
