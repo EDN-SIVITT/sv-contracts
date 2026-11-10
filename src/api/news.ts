@@ -112,6 +112,11 @@ export interface NewsCellInput {
   contentHtml: string;
   /** ลำดับบนลงล่าง · id = รูป staged ของผู้บันทึก หรือรูปเดิมของข่าวนี้ */
   imageIds: string[];
+  /**
+   * คำอธิบายใต้รูป ขนานกับ `imageIds` (ยาวเท่ากัน — ไม่เท่า = 422 `cells[i].imageCaptions` MISMATCH) · `''` = ไม่มี · ไม่ส่ง = ไม่มีทุกรูปของส่วนนี้ ·
+   * normalize ช่องว่างแล้ว ≤ `CONTENT_IMAGE_CAPTION_MAX` (เกิน = 422 `cells[i].imageCaptions` TOO_LONG + `index`) — `SV-CR-028` §3 · SV-ADR-169
+   */
+  imageCaptions?: string[];
 }
 
 /** `POST /news` — สร้างเป็นฉบับร่างเสมอ (เผยแพร่ = `POST /news/:id/publish`) */

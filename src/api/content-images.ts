@@ -55,6 +55,22 @@ export interface ContentImageView {
   height: number;
   /** ชื่อไฟล์เดิม — public ไม่ส่ง (`null`) */
   name: string | null;
+  /**
+   * คำอธิบายใต้รูป (รูปใน post cell ของข่าว/กองทุน/แคมเปญ · `SV-CR-028` §3 · SV-ADR-169) — ข้อความล้วน 1 บรรทัด ≤ `CONTENT_IMAGE_CAPTION_MAX` ·
+   * `null`/ไม่มี = ไม่แสดงอะไรใต้รูป · API ส่งทุกทาง (CMS · public · LINE OA) · ฟอร์มใช้ `''` แทน "ติ๊กแล้วแต่ยังว่าง" (ไม่ถูกบันทึก)
+   */
+  caption?: string | null;
+}
+
+/** คำอธิบายใต้รูปยาวได้ไม่เกิน (ตัวอักษร · หลัง normalize ช่องว่าง) — `content_images.caption` VARCHAR(200) */
+export const CONTENT_IMAGE_CAPTION_MAX = 200;
+
+/**
+ * คำอธิบายใต้รูปที่จะแสดง/ส่ง — ช่องว่าง/ขึ้นบรรทัดซ้อนเหลือเว้นวรรคเดียว · ตัดหัวท้าย · ว่าง = `null` (กติกาเดียวกับ API · ใช้ทั้งฟอร์มและหน้าแสดงผล)
+ */
+export function normalizeContentImageCaption(value: string | null | undefined): string | null {
+  const text = (value ?? '').replace(/\s+/gu, ' ').trim();
+  return text === '' ? null : text;
 }
 
 /** ผลอัปโหลด staged (`POST /<เมนู>/images`) · คัดลอก (`POST /legal-documents/images/copy`) */
