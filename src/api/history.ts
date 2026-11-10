@@ -89,8 +89,12 @@ export const RECORD_HISTORY_FIELDS = {
   ],
   /** `program` / `fund` = "รหัส · ชื่อ" ของแม่ (เทียบด้วย id) · รายการบริจาค `fund` / `campaign` แบบเดียวกัน (`T-126`) */
   [PermissionSubject.PROGRAMS]: ['code', 'name', 'description', 'status'],
-  [PermissionSubject.FUNDS]: ['code', 'name', 'program', 'description', 'status'],
-  [PermissionSubject.CAMPAIGNS]: ['code', 'name', 'fund', 'description', 'year', 'startDate', 'endDate', 'targetAmount', 'status'],
+  /** `contentSections` / `contentImages` / `contentTextLength` = ตัวนับเนื้อหา post cell ของกองทุน/แคมเปญ (`SV-CR-027` · `T-231`) */
+  [PermissionSubject.FUNDS]: ['code', 'name', 'program', 'description', 'status', 'contentSections', 'contentImages', 'contentTextLength'],
+  [PermissionSubject.CAMPAIGNS]: [
+    'code', 'name', 'fund', 'description', 'year', 'startDate', 'endDate', 'targetAmount', 'status',
+    'contentSections', 'contentImages', 'contentTextLength',
+  ],
   /** `address` = ข้อความประกอบภาษาไทยตาม `format` (แบบที่ใช้ส่งของ) · ไม่มี LINE userId / URL รูป / ยอดบริจาค (`T-148`) */
   [PermissionSubject.DONORS]: ['fullName', 'phone', 'email', 'lineId', 'taxId', 'address', 'status', 'donorGroup'],
   /** `status` = `NewsStatus` · `coverImage` = ชื่อไฟล์ปก · `sections` = จำนวน post cell · `images` = รูปทั้งหมดรวมปก · `textLength` = ตัวอักษรรวม (`T-224`) */

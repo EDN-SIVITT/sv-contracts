@@ -10,6 +10,10 @@ export const ContentImageScope = {
   LEGAL: 'LEGAL',
   /** ข่าวสาร (`news_articles.id`) */
   NEWS: 'NEWS',
+  /** เนื้อหา post cell ของกองทุน (`funds.id` · `SV-CR-027` · SV-ADR-166) — role `BODY` + `cell_id` = `fundraising_cells.id` */
+  FUND: 'FUND',
+  /** เนื้อหา post cell ของแคมเปญ (`campaigns.id` · SV-ADR-166) */
+  CAMPAIGN: 'CAMPAIGN',
 } as const;
 export type ContentImageScope = (typeof ContentImageScope)[keyof typeof ContentImageScope];
 export const CONTENT_IMAGE_SCOPES = Object.values(ContentImageScope) as readonly ContentImageScope[];
@@ -64,11 +68,13 @@ export interface ContentImageCopyResult {
   images: ContentImageView[];
 }
 
-/** path proxy บนเว็บ (origin เดียวกับหน้า — CSP `img-src 'self'`) — `/content-image/<legal|news>/<id>/<size>?v=` */
+/** path proxy บนเว็บ (origin เดียวกับหน้า — CSP `img-src 'self'`) — `/content-image/<legal|news|fund|campaign>/<id>/<size>?v=` */
 export const CONTENT_IMAGE_PATH = '/content-image/';
 export const CONTENT_IMAGE_SCOPE_SLUGS: Readonly<Record<ContentImageScope, string>> = {
   LEGAL: 'legal',
   NEWS: 'news',
+  FUND: 'fund',
+  CAMPAIGN: 'campaign',
 };
 
 /** URL รูปบนเว็บ — proxy ตัดสินเองว่าใช้ทาง CMS (มี cookie) หรือทาง public */

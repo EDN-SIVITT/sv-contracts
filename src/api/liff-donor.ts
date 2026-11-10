@@ -53,6 +53,8 @@ export interface LiffCampaignOption {
   endDate: string | null;
   /** ไอคอนที่อัปโหลด (`campaignIconUrl` — public เฉพาะที่เปิดรับ) · `null` = ไม่มี (หน้ารายการใช้ไอคอนกองทุน → ไอคอนพื้นฐาน) — `T-192` */
   iconUrl: string | null;
+  /** สัดส่วนรูปแคมเปญ กว้าง/สูง (`SV-CR-027` · SV-ADR-167 · `campaignImageRatio`) · `null` = ไม่มีรูป/รูปเดิมจัตุรัส */
+  iconRatio: number | null;
   /** ป้าย "มีของที่ระลึก" (`T-192` · SV-ADR-140) = โหมดของที่ระลึกไม่ใช่ `NONE` + มีกฎที่มีผลวันนี้ของของ `ACTIVE` ไม่ลบ ≥ 1 (ไม่ดูสต็อก) */
   hasSouvenirs: boolean;
 }

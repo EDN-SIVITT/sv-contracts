@@ -1,4 +1,5 @@
 import type { DonationActorView } from './donations';
+import type { FundraisingCellInput, FundraisingCellView } from './fundraising-content';
 import type { CampaignSouvenirRuleMode } from './fundraising-souvenirs';
 
 /**
@@ -163,6 +164,8 @@ export interface FundCampaignItem extends FundraisingRef {
 /** `GET /funds/:id` */
 export interface FundView extends FundListItemView, FundraisingViewBase {
   campaigns: FundCampaignItem[];
+  /** เนื้อหา post cell ตามลำดับ (`SV-CR-027` · SV-ADR-166 · `fundraising-content.ts`) · ว่าง = ไม่มีเนื้อหา */
+  cells: FundraisingCellView[];
 }
 
 /** body ของ `POST /funds` — `PATCH` = `Partial` · ย้ายโปรแกรมได้ (รายการบริจาคไม่เก็บโปรแกรม) */
@@ -172,6 +175,8 @@ export interface FundInput extends ProgramInput {
    * ชั้นโปรแกรม**เปิด**: สร้างต้องส่ง (ไม่ส่ง → 422 `FUND_PROGRAM_REQUIRED`) · แก้ไข `null` = ล้างโปรแกรม · ชั้นโปรแกรม**ปิด**: ช่องนี้ถูกเมิน (สร้าง = ไม่มีโปรแกรม · แก้ = คงเดิม) — SV-ADR-090
    */
   programId?: string | null;
+  /** เนื้อหา post cell ทั้งชุดตามลำดับ (SV-ADR-166) — id เดิม = แก้ · ไม่มี id = เพิ่ม · cell เดิมที่ไม่อยู่ = ลบ · ไม่ส่ง = ไม่แตะ */
+  cells?: FundraisingCellInput[];
 }
 
 // ── รหัสกองทุนอัตโนมัติ + ตรวจรหัสซ้ำ (`SV-CR-018` §4 · `T-189` · FT-18 `REQ-FND-020` · SV-ADR-137) ─────────────────
@@ -247,6 +252,10 @@ export interface CampaignListItemView extends FundraisingListItemBase {
 export interface CampaignView extends CampaignListItemView, FundraisingViewBase {
   /** โหมดของที่ระลึก (`SV-CR-008` · `T-132`) — แก้ผ่าน `PATCH /campaigns/:id/souvenir-mode` (หรือ `PUT …/souvenir-rules` เดิม) · ชนิดสต็อกอยู่ต่อของ (`GET …/souvenirs` · `T-194`) */
   souvenirRuleMode: CampaignSouvenirRuleMode;
+  /** สัดส่วนรูปแคมเปญ กว้าง/สูง ปัด 3 ตำแหน่ง (`SV-CR-027` §3 · SV-ADR-167) · `null` = ไม่มีรูป หรือรูปเดิมก่อน `0060` (จัตุรัส — แสดง 1:1) */
+  iconRatio: number | null;
+  /** เนื้อหา post cell ตามลำดับ (SV-ADR-166) · ว่าง = ไม่มีเนื้อหา */
+  cells: FundraisingCellView[];
 }
 
 /** body ของ `POST /campaigns` — `PATCH` = `Partial` */
@@ -260,6 +269,8 @@ export interface CampaignInput extends ProgramInput {
   endDate?: string | null;
   /** > 0 และ ≤ `CAMPAIGN_TARGET_AMOUNT_MAX` · ทศนิยม ≤ 2 ตำแหน่ง · รับข้อความหรือตัวเลข (แบบ `SouvenirInput.value`) · `''`/`null` = ไม่ตั้งเป้า */
   targetAmount?: string | number | null;
+  /** เนื้อหา post cell ทั้งชุดตามลำดับ (SV-ADR-166) — กติกาเดียวกับ `FundInput.cells` · ไม่ส่ง = ไม่แตะ */
+  cells?: FundraisingCellInput[];
 }
 
 export interface CampaignListQuery extends Omit<FundraisingListQuery, 'sort'> {
@@ -340,6 +351,43 @@ export const FUNDRAISING_ICON_SOURCE_MIN_PX = 16;
 export const FUNDRAISING_ICON_SOURCE_MAX_PX = 8000;
 /** `icon_version` = hex 8 ตัว สุ่มใหม่ทุกครั้งที่อัปโหลด → URL `?v=` เปลี่ยน */
 export const FUNDRAISING_ICON_VERSION_LENGTH = 8;
+
+// ── รูปแคมเปญแบบประชาสัมพันธ์ (`SV-CR-027` §3 · SV-ADR-167 · `T-231`) ──────────────────────────────────
+
+/**
+ * แคมเปญใช้ endpoint/ช่องรูปเดิม (`POST /campaigns/:id/icon`) แต่**ไม่บังคับจัตุรัส** — API เก็บ WebP q82 คงสัดส่วน (`fit: inside`) ด้านยาว ≤ `CAMPAIGN_IMAGE_MAX_PX`
+ * (ไม่ขยายรูปเล็ก) · สัดส่วนกว้าง/สูง (หลังหมุน EXIF) นอก `CAMPAIGN_IMAGE_RATIO_MIN`…`MAX` = 422 `IMAGE_DIMENSIONS_INVALID { reason: 'RATIO' }` ·
+ * เก็บ `campaigns.icon_width/icon_height` (`0060`) → `iconRatio` · กองทุนคงจัตุรัส `FUNDRAISING_ICON_PX` เดิม
+ */
+export const CAMPAIGN_IMAGE_MAX_PX = 1280;
+/** popup ตัดรูปของเว็บ: ผล JPEG ที่ 1280 เกิน `FUNDRAISING_ICON_MAX_BYTES` → ตัดใหม่ที่ด้านยาวนี้ */
+export const CAMPAIGN_IMAGE_FALLBACK_PX = 960;
+/** สัดส่วนกว้าง/สูงที่รับ — 1:2 … 3:1 */
+export const CAMPAIGN_IMAGE_RATIO_MIN = 0.5;
+export const CAMPAIGN_IMAGE_RATIO_MAX = 3;
+/** สัดส่วนให้เลือกใน popup ตัดรูป — ตัวแรก = ค่าเริ่มต้น */
+export const CAMPAIGN_IMAGE_ASPECTS = [
+  { key: '16:9', w: 16, h: 9 },
+  { key: '4:3', w: 4, h: 3 },
+  { key: '1:1', w: 1, h: 1 },
+  { key: '4:5', w: 4, h: 5 },
+] as const;
+
+/** ช่วงสัดส่วน (กว้าง/สูง) ที่หน้าเว็บใช้แสดงรูปแคมเปญ (`object-cover`) */
+export interface CampaignImageRatioRange {
+  min: number;
+  max: number;
+}
+/** การ์ดรายการแคมเปญ + หน้าเลือกแคมเปญของแจ้งบริจาค — บีบช่วง 1:1 … 2:1 */
+export const CAMPAIGN_IMAGE_CARD_RATIO: CampaignImageRatioRange = { min: 1, max: 2 };
+/** hero หน้ารายละเอียดแคมเปญ — 4:5 … 2:1 */
+export const CAMPAIGN_IMAGE_HERO_RATIO: CampaignImageRatioRange = { min: 0.8, max: 2 };
+
+/** สัดส่วนที่ใช้แสดง — `null` (ไม่มีรูป/รูปเดิมจัตุรัส) = 1 แล้วบีบเข้าช่วง `range` */
+export function campaignImageRatio(ratio: number | null, range: CampaignImageRatioRange): number {
+  const value = ratio !== null && Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
+  return Math.min(range.max, Math.max(range.min, value));
+}
 
 /** entity ที่ประทับลง audit (`@Audit({ entity })`) — subject = `funds` / `campaigns` · before/after = สรุป (ไม่มี object key) */
 export const FundraisingIconAuditEntity = {
