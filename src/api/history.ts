@@ -93,7 +93,7 @@ export const RECORD_HISTORY_FIELDS = {
   [PermissionSubject.FUNDS]: ['code', 'name', 'program', 'description', 'status', 'contentSections', 'contentImages', 'contentTextLength'],
   [PermissionSubject.CAMPAIGNS]: [
     'code', 'name', 'fund', 'description', 'year', 'startDate', 'endDate', 'targetAmount', 'status',
-    'contentSections', 'contentImages', 'contentTextLength',
+    'contentSections', 'contentImages', 'contentTextLength', 'displayRank',
   ],
   /** `address` = ข้อความประกอบภาษาไทยตาม `format` (แบบที่ใช้ส่งของ) · ไม่มี LINE userId / URL รูป / ยอดบริจาค (`T-148`) */
   [PermissionSubject.DONORS]: ['fullName', 'phone', 'email', 'lineId', 'taxId', 'address', 'status', 'donorGroup'],

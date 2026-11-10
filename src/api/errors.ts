@@ -266,6 +266,8 @@ export const ErrorCode = {
   CAMPAIGN_ALLOCATION_RELEASE_EXCEEDS: 'CAMPAIGN_ALLOCATION_RELEASE_EXCEEDS',
   /** ลบแคมเปญที่ยังกันของไว้ (remaining > 0) — 409 `details { remaining }` · คืนส่วนที่ไม่ใช้ก่อน */
   CAMPAIGN_HAS_ALLOCATIONS: 'CAMPAIGN_HAS_ALLOCATIONS',
+  /** บันทึกลำดับบน LINE OA ขณะชุดปักหมุดถูกแก้จากที่อื่น หรือมีแคมเปญที่ไม่พบ/ถูกลบ (`SV-CR-029` · SV-ADR-170) — 409 · โหลดหน้าใหม่แล้วจัดอีกครั้ง */
+  CAMPAIGN_DISPLAY_ORDER_CHANGED: 'CAMPAIGN_DISPLAY_ORDER_CHANGED',
   // ── ช่องทางติดต่อ (`SV-CR-009` ข้อ 3 · FT-20 · SV-ADR-094 · `T-136`) — ค่าผิดกฎตามประเภทใช้ `VALIDATION_FAILED { field, reason }` · ไอคอนใช้ `FILE_*` / `IMAGE_DIMENSIONS_INVALID` ──
   /** ไม่พบช่องทางติดต่อ (ไม่มี/ถูกลบ/id ไม่ใช่ตัวเลข) — 404 `details { id }` */
   CONTACT_CHANNEL_NOT_FOUND: 'CONTACT_CHANNEL_NOT_FOUND',

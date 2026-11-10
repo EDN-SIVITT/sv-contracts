@@ -57,6 +57,8 @@ export interface LiffCampaignOption {
   iconRatio: number | null;
   /** ป้าย "มีของที่ระลึก" (`T-192` · SV-ADR-140) = โหมดของที่ระลึกไม่ใช่ `NONE` + มีกฎที่มีผลวันนี้ของของ `ACTIVE` ไม่ลบ ≥ 1 (ไม่ดูสต็อก) */
   hasSouvenirs: boolean;
+  /** ลำดับปักหมุด (`SV-CR-029` · SV-ADR-170) — มีค่า = ขึ้นก่อนตามเลขน้อย → มาก · `null` = เรียงอัตโนมัติต่อท้าย (วันสิ้นสุดใกล้ก่อน) */
+  displayRank: number | null;
 }
 
 /** กองทุนที่เปิดรับ (active ตลอดสาย) · `campaigns` ว่าง = บริจาคเข้ากองทุนโดยไม่ระบุแคมเปญ · `program` = `null` เมื่อไม่มีโปรแกรมหรือชั้นโปรแกรมปิด */
@@ -70,7 +72,7 @@ export interface LiffFundOption {
   campaigns: LiffCampaignOption[];
 }
 
-/** เรียง: (ชั้นโปรแกรมเปิด) ชื่อโปรแกรม → ชื่อกองทุน → id · แคมเปญ: วันสิ้นสุดใกล้ก่อน (null ท้าย) → ชื่อ → id · `today` = วันนี้ของ Bangkok (ค่าเริ่มต้นวันโอน + ห้ามอนาคต) */
+/** เรียง: (ชั้นโปรแกรมเปิด) ชื่อโปรแกรม → ชื่อกองทุน → id · แคมเปญ: ปักหมุด (`displayRank`) ก่อน → วันสิ้นสุดใกล้ก่อน (null ท้าย) → ชื่อ → id · `today` = วันนี้ของ Bangkok (ค่าเริ่มต้นวันโอน + ห้ามอนาคต) */
 export interface LiffDonateOptionsView {
   programEnabled: boolean;
   today: string;

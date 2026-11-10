@@ -47,11 +47,15 @@ export const FundraisingSort = {
 } as const;
 export type FundraisingSort = (typeof FundraisingSort)[keyof typeof FundraisingSort];
 
-/** ลำดับของ list แคมเปญ — เพิ่มเรียงตามปี (ไม่มีปีอยู่ท้ายเสมอ) */
+/**
+ * ลำดับของ list แคมเปญ — เพิ่มเรียงตามปี (ไม่มีปีอยู่ท้ายเสมอ) ·
+ * `line_order` = ลำดับที่ผู้บริจาคเห็นใน LINE OA (`SV-CR-029` · SV-ADR-170): แคมเปญที่แสดงอยู่ก่อน (ปักหมุดตาม `displayRank` → วันสิ้นสุดใกล้ก่อน → ชื่อ) แล้วจึงที่ไม่แสดง (กติกาเดียวกัน)
+ */
 export const CampaignSort = {
   ...FundraisingSort,
   YEAR_ASC: 'year_asc',
   YEAR_DESC: 'year_desc',
+  LINE_ORDER: 'line_order',
 } as const;
 export type CampaignSort = (typeof CampaignSort)[keyof typeof CampaignSort];
 
@@ -232,8 +236,37 @@ export const FUNDRAISING_PROGRAM_FILTER_NONE = 'none';
 
 // ── แคมเปญ (`campaigns`) ────────────────────────────────────────────────────────────────────────
 
-/** แถวของ `GET /campaigns` */
-export interface CampaignListItemView extends FundraisingListItemBase {
+/**
+ * สถานะของแคมเปญบน LINE OA ผู้บริจาค (`SV-CR-029` · SV-ADR-170) — ตัดสินตามลำดับ: `INACTIVE` แคมเปญปิดใช้งาน → `PARENT_INACTIVE` กองทุน (หรือโปรแกรม เมื่อชั้นโปรแกรมเปิด) ปิด/ถูกลบ →
+ * `ENDED` วันสิ้นสุด < วันนี้ → `UPCOMING` วันเริ่ม > วันนี้ → `VISIBLE` แสดงอยู่ (= `OPEN_CAMPAIGNS` + `CAMPAIGN_OPEN_ON` ของ API · วันนี้ = Asia/Bangkok)
+ */
+export const CampaignLineOaState = {
+  VISIBLE: 'VISIBLE',
+  UPCOMING: 'UPCOMING',
+  ENDED: 'ENDED',
+  INACTIVE: 'INACTIVE',
+  PARENT_INACTIVE: 'PARENT_INACTIVE',
+} as const;
+export type CampaignLineOaState = (typeof CampaignLineOaState)[keyof typeof CampaignLineOaState];
+
+/** ตัวกรอง `lineOa=` ของ list แคมเปญ — `visible` = แสดงบน LINE OA ตอนนี้ · `hidden` = ไม่แสดง (สถานะอื่นทั้งหมด) */
+export const CampaignLineOaFilter = {
+  VISIBLE: 'visible',
+  HIDDEN: 'hidden',
+} as const;
+export type CampaignLineOaFilter = (typeof CampaignLineOaFilter)[keyof typeof CampaignLineOaFilter];
+
+/** ปักหมุดได้สูงสุด (`PUT /campaigns/display-order` · SV-ADR-170) */
+export const CAMPAIGN_DISPLAY_PINNED_MAX = 50;
+
+/** ตำแหน่งบน LINE OA ของแถว list — `place` = ลำดับที่ (1 = บนสุด) ในหน้า "กองทุนและแคมเปญ" / ขั้นเลือกแคมเปญของแจ้งบริจาค · `null` = ไม่แสดง */
+export interface CampaignLineOaView {
+  state: CampaignLineOaState;
+  place: number | null;
+}
+
+/** ช่องร่วมของแถว list และหน้า view แคมเปญ */
+export interface CampaignSummaryView extends FundraisingListItemBase {
   fund: FundraisingRef;
   /** โปรแกรมปัจจุบันของกองทุน · `null` = กองทุนยังไม่จัดโปรแกรม (`T-131`) */
   program: FundraisingRef | null;
@@ -246,10 +279,17 @@ export interface CampaignListItemView extends FundraisingListItemBase {
   targetAmount: string | null;
   /** ไอคอนที่อัปโหลด (`campaignIconUrl` · PNG 256×256) · `null` = ไม่มี (หน้าเว็บแสดงไอคอนพื้นฐานของเมนู) — `T-188` */
   iconUrl: string | null;
+  /** ลำดับปักหมุดบน LINE OA (1 = บนสุด · SV-ADR-170) · `null` = เรียงอัตโนมัติ (วันสิ้นสุดใกล้ก่อน) — แก้ผ่าน `PUT /campaigns/display-order` เท่านั้น */
+  displayRank: number | null;
+}
+
+/** แถวของ `GET /campaigns` */
+export interface CampaignListItemView extends CampaignSummaryView {
+  lineOa: CampaignLineOaView;
 }
 
 /** `GET /campaigns/:id` */
-export interface CampaignView extends CampaignListItemView, FundraisingViewBase {
+export interface CampaignView extends CampaignSummaryView, FundraisingViewBase {
   /** โหมดของที่ระลึก (`SV-CR-008` · `T-132`) — แก้ผ่าน `PATCH /campaigns/:id/souvenir-mode` (หรือ `PUT …/souvenir-rules` เดิม) · ชนิดสต็อกอยู่ต่อของ (`GET …/souvenirs` · `T-194`) */
   souvenirRuleMode: CampaignSouvenirRuleMode;
   /** สัดส่วนรูปแคมเปญ กว้าง/สูง ปัด 3 ตำแหน่ง (`SV-CR-027` §3 · SV-ADR-167) · `null` = ไม่มีรูป หรือรูปเดิมก่อน `0060` (จัตุรัส — แสดง 1:1) */
@@ -277,11 +317,54 @@ export interface CampaignListQuery extends Omit<FundraisingListQuery, 'sort'> {
   programId?: string;
   fundId?: string;
   sort?: CampaignSort;
+  /** สถานะบน LINE OA ตอนนี้ (`SV-CR-029`) — ไม่ส่ง = ทั้งหมด */
+  lineOa?: CampaignLineOaFilter;
   /**
    * ปี ค.ศ. `CAMPAIGN_YEAR_MIN`–`CAMPAIGN_YEAR_MAX` (`T-200` · SV-ADR-147) — แคมเปญที่ช่อง "ปี" = ปีนั้น หรือช่วงแคมเปญคาบเกี่ยวปีนั้น:
    * ปีเริ่ม = วันเริ่ม → ช่อง "ปี" → ปีที่สร้าง (เวลาไทย) · ปีสิ้นสุด = วันสิ้นสุด → (ไม่มีวันเริ่ม + มีช่อง "ปี" = ปีนั้น) → ยังดำเนินอยู่ ถึงปีปัจจุบัน (ไม่ลามปีอนาคต)
    */
   year?: number;
+}
+
+// ── ลำดับบน LINE OA (`SV-CR-029` · SV-ADR-170) ─────────────────────────────────────────────────────
+
+/** 1 แถวของหน้า "จัดลำดับบน LINE OA" */
+export interface CampaignDisplayOrderItem {
+  id: string;
+  code: string | null;
+  name: string;
+  fund: { id: string; name: string };
+  /** `null` = กองทุนไม่มีโปรแกรม หรือชั้นโปรแกรมปิด */
+  program: { id: string; name: string } | null;
+  iconUrl: string | null;
+  /** สัดส่วนรูปแคมเปญ (`campaignImageRatio`) · `null` = ไม่มีรูป/รูปเดิมจัตุรัส */
+  iconRatio: number | null;
+  startDate: string | null;
+  endDate: string | null;
+  displayRank: number | null;
+  state: CampaignLineOaState;
+  /** ลำดับที่บน LINE OA ตอนนี้ · `null` = ไม่แสดง */
+  place: number | null;
+}
+
+/**
+ * `GET /campaigns/display-order` (campaigns READ_ONLY) — แถว = แคมเปญที่ปักหมุด (ทุกสถานะ · ตาม `displayRank`) แล้วตามด้วยแคมเปญที่ไม่ปักหมุดแต่แสดงอยู่ (ลำดับ LINE OA) →
+ * ยังไม่ถึงวันเริ่ม (วันเริ่มใกล้ก่อน) · ไม่รวมแคมเปญที่ไม่ปักหมุดและสิ้นสุด/ปิดอยู่ · `pinnedIds` = ชุดปักหมุดปัจจุบัน (ส่งกลับเป็น `baseline` ตอนบันทึก)
+ */
+export interface CampaignDisplayOrderView {
+  /** วันนี้ (Asia/Bangkok · `YYYY-MM-DD`) */
+  today: string;
+  pinnedIds: string[];
+  items: CampaignDisplayOrderItem[];
+}
+
+/**
+ * body ของ `PUT /campaigns/display-order` (campaigns MAINTAIN) — `pinnedIds` = ชุดปักหมุดใหม่ทั้งชุดตามลำดับ (ว่าง = เรียงอัตโนมัติทั้งหมด · ≤ `CAMPAIGN_DISPLAY_PINNED_MAX` · ห้ามซ้ำ) ·
+ * `baseline` = `pinnedIds` ที่หน้าเว็บโหลดมา — ไม่ตรงชุดปัจจุบัน / มีแคมเปญที่ไม่พบหรือถูกลบ = 409 `CAMPAIGN_DISPLAY_ORDER_CHANGED` (ไม่เขียนอะไร)
+ */
+export interface CampaignDisplayOrderInput {
+  pinnedIds: string[];
+  baseline: string[];
 }
 
 /** `GET /campaigns/years` (campaigns READ_ONLY · `T-200`) — ตัวเลือกของตัวกรองปี: ทุกปี ค.ศ. ที่มีแคมเปญ (ที่ยังไม่ลบ) ตามกติกาของ `year=` · ใหม่ → เก่า */
