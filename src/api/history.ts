@@ -20,6 +20,8 @@ export const RECORD_HISTORY_MENUS = [
   PermissionSubject.CAMPAIGNS,
   // ผู้บริจาค (`SV-CR-011` · `T-148` · SV-ADR-102) — รวมการกระทำของผู้บริจาคเองผ่าน LINE OA (ผู้กระทำ "<ชื่อ LINE> (LINE · DNR…)")
   PermissionSubject.DONORS,
+  // ข่าวสาร (`SV-CR-025` §3 · `T-224` · SV-ADR-163) — หน้าเว็บอยู่ใต้ `/content/news` (`NEWS_CMS_PATH` ไม่ใช่ `/${menu}`)
+  PermissionSubject.NEWS,
 ] as const;
 export type RecordHistoryMenu = (typeof RECORD_HISTORY_MENUS)[number];
 
@@ -91,6 +93,8 @@ export const RECORD_HISTORY_FIELDS = {
   [PermissionSubject.CAMPAIGNS]: ['code', 'name', 'fund', 'description', 'year', 'startDate', 'endDate', 'targetAmount', 'status'],
   /** `address` = ข้อความประกอบภาษาไทยตาม `format` (แบบที่ใช้ส่งของ) · ไม่มี LINE userId / URL รูป / ยอดบริจาค (`T-148`) */
   [PermissionSubject.DONORS]: ['fullName', 'phone', 'email', 'lineId', 'taxId', 'address', 'status', 'donorGroup'],
+  /** `status` = `NewsStatus` · `coverImage` = ชื่อไฟล์ปก · `sections` = จำนวน post cell · `images` = รูปทั้งหมดรวมปก · `textLength` = ตัวอักษรรวม (`T-224`) */
+  [PermissionSubject.NEWS]: ['title', 'status', 'coverImage', 'sections', 'images', 'textLength'],
 } as const satisfies Record<RecordHistoryMenu, readonly string[]>;
 export type RecordHistoryField = (typeof RECORD_HISTORY_FIELDS)[RecordHistoryMenu][number];
 

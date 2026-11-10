@@ -309,6 +309,20 @@ export const ErrorCode = {
   LEGAL_DOCUMENT_STALE: 'LEGAL_DOCUMENT_STALE',
   /** แก้เวอร์ชันที่เผยแพร่อยู่ต้องมีสิทธิ์ FULL (หน้าสาธารณะเปลี่ยนทันที · SV-ADR-160) — 403 */
   LEGAL_DOCUMENT_PUBLISHED_LOCKED: 'LEGAL_DOCUMENT_PUBLISHED_LOCKED',
+  /** รูปของเนื้อหา (`SV-CR-025` §1 · SV-ADR-161) — ไฟล์ไม่ใช่รูปที่รับ (JPG/PNG/WebP/GIF) · อ่านไม่ได้ · ใหญ่เกิน `s3.maxUploadSizeMb` — 422 `details { reason }` */
+  CONTENT_IMAGE_INVALID: 'CONTENT_IMAGE_INVALID',
+  /** id รูปที่อ้างไม่ใช่รูป staged ของผู้บันทึกหรือรูปของรายการนี้ (หรือถูกลบไปแล้ว) — 422 ตอนบันทึก `details { imageId }` · ดึงไฟล์ไม่พบ = 404 */
+  CONTENT_IMAGE_NOT_FOUND: 'CONTENT_IMAGE_NOT_FOUND',
+  /** รูปเกินเพดาน (ต่อเวอร์ชัน · ต่อ cell · staged ค้างต่อคน) — 422 `details { max }` */
+  CONTENT_IMAGES_LIMIT: 'CONTENT_IMAGES_LIMIT',
+  /** ข่าวสาร (`SV-CR-025` §3 · SV-ADR-163) — ไม่พบ/ถูกลบ — 404 `details { id }` */
+  NEWS_NOT_FOUND: 'NEWS_NOT_FOUND',
+  /** มีคนแก้ข่าวนี้คั่นกลาง (`expectedUpdatedAt` ไม่ตรง) — 409 · ฟอร์มโหลดค่าล่าสุดได้ */
+  NEWS_STALE: 'NEWS_STALE',
+  /** แก้ข่าวที่เผยแพร่อยู่ต้องมีสิทธิ์ FULL (หน้า public เปลี่ยนทันที) — 403 */
+  NEWS_PUBLISHED_LOCKED: 'NEWS_PUBLISHED_LOCKED',
+  /** เผยแพร่ข่าวที่ยังไม่มีเนื้อหา (0 cell) — 422 */
+  NEWS_CONTENT_REQUIRED: 'NEWS_CONTENT_REQUIRED',
   /** ใช้กับ validation error ทั่วไปที่ไม่มี code เฉพาะ */
   VALIDATION_FAILED: 'VALIDATION_FAILED',
   NOT_FOUND: 'NOT_FOUND',

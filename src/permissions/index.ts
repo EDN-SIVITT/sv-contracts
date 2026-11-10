@@ -40,6 +40,11 @@ export const PermissionSubject = {
    * READ_ONLY ดู · MAINTAIN เพิ่ม/แก้**ฉบับร่าง** · FULL เผยแพร่ + แก้เวอร์ชันที่เผยแพร่อยู่ (หน้าสาธารณะเปลี่ยนทันที) (`REQ-LGL-*`)
    */
   LEGAL_DOCUMENTS: 'legal_documents',
+  /**
+   * ข่าวสาร (e-Donation · กลุ่มเมนู "จัดการเนื้อหา" · `SV-CR-025` §3 · SV-ADR-163) — READ_ONLY ดู/ประวัติ · MAINTAIN เพิ่ม + แก้ข่าวที่**ยังไม่เผยแพร่** ·
+   * FULL เผยแพร่/เลิกเผยแพร่ + แก้ข่าวที่เผยแพร่อยู่ + ลบ (soft) (`REQ-NWS-*`)
+   */
+  NEWS: 'news',
   SYSTEM_USERS: 'system_users',
   USER_GROUPS: 'user_groups',
   AUDIT_LOGS: 'audit_logs',

@@ -1,3 +1,4 @@
+import type { ContentImageView } from './content-images';
 import type { DonationActorView } from './donations';
 
 /**
@@ -32,6 +33,37 @@ export const LEGAL_DOCUMENT_PUBLIC_PATHS: Readonly<Record<LegalDocumentType, str
   TERMS_OF_USE: '/termsofuse',
 };
 
+/**
+ * รูปแบบเนื้อหาของเวอร์ชัน (`SV-CR-025` §2 · SV-ADR-162) — 1 เวอร์ชัน = 1 รูปแบบ · ข้อมูลของรูปแบบที่ไม่ได้เลือกเก็บไว้ (สลับกลับได้) แต่ตรวจ/แสดง/เผยแพร่เฉพาะรูปแบบที่เลือก
+ * `TEXT` = HTML จาก editor (เดิม · ค่าเริ่มต้นของแถวเดิม) · `IMAGES` = รูปหลายรูปเรียงลงมาเต็มกว้าง · `LINK` = หน้า public redirect 307 ไป `linkUrl`
+ */
+export const LegalContentType = {
+  TEXT: 'TEXT',
+  IMAGES: 'IMAGES',
+  LINK: 'LINK',
+} as const;
+export type LegalContentType = (typeof LegalContentType)[keyof typeof LegalContentType];
+export const LEGAL_CONTENT_TYPES = Object.values(LegalContentType) as readonly LegalContentType[];
+/** รูปต่อเวอร์ชัน (`IMAGES`) ไม่เกิน */
+export const LEGAL_DOCUMENT_IMAGES_MAX = 30;
+/** URL ปลายทาง (`LINK`) ยาวไม่เกิน — `http(s)` สมบูรณ์ · ไม่มี user:pass */
+export const LEGAL_DOCUMENT_LINK_MAX = 2048;
+
+/** URL ที่ใช้เป็นปลายทาง redirect ได้ (ตัวเดียวกับที่ API ตรวจ) — `null` = ใช้ไม่ได้ · คืนค่าที่ตัดช่องว่างแล้ว */
+export function normalizeLegalLinkUrl(value: string | null | undefined): string | null {
+  const raw = (value ?? '').trim();
+  if (!raw || raw.length > LEGAL_DOCUMENT_LINK_MAX || /\s/.test(raw)) return null;
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+  if (!url.hostname || url.username || url.password) return null;
+  return raw;
+}
+
 /** เลขเวอร์ชัน — ข้อความอิสระ (`1.0` · `2026-11`) ยาวไม่เกินนี้ · ตัดช่องว่างหัวท้าย · ไม่ซ้ำในชนิดเดียวกัน (ไม่สนตัวพิมพ์) */
 export const LEGAL_DOCUMENT_VERSION_MAX = 32;
 /** เนื้อหา HTML หลัง sanitize ยาวไม่เกินนี้ (ตัวอักษร) — เอกสารกฎหมายยาวสุดราว 100–200 KB */
@@ -49,8 +81,14 @@ export interface LegalDocumentVersionSummaryView {
   isPublished: boolean;
   publishedAt: string | null;
   publishedBy: DonationActorView | null;
-  /** จำนวนตัวอักษรของข้อความล้วน (ไม่นับแท็ก) — แสดงความยาวคร่าว ๆ ในตาราง */
+  /** รูปแบบที่เลือก (`SV-CR-025`) — ตารางแสดงป้ายตามนี้ */
+  contentType: LegalContentType;
+  /** จำนวนตัวอักษรของข้อความล้วน (ไม่นับแท็ก) — แสดงความยาวคร่าว ๆ ในตาราง (`TEXT`) */
   textLength: number;
+  /** จำนวนรูปที่ผูกกับเวอร์ชันนี้ (`IMAGES`) */
+  imageCount: number;
+  /** ปลายทาง (`LINK`) · ไม่มี = `null` */
+  linkUrl: string | null;
   createdAt: string;
   updatedAt: string;
   createdBy: DonationActorView | null;
@@ -59,6 +97,8 @@ export interface LegalDocumentVersionSummaryView {
 
 export interface LegalDocumentVersionView extends LegalDocumentVersionSummaryView {
   contentHtml: string;
+  /** รูปตามลำดับแสดง (เก็บไว้แม้เลือกรูปแบบอื่น) */
+  images: ContentImageView[];
 }
 
 /** `GET /legal-documents/:type/versions` — ใหม่สุดก่อน (`id` มาก → น้อย) · ไม่แบ่งหน้า (เอกสารมีไม่กี่สิบเวอร์ชัน) */
@@ -69,16 +109,26 @@ export interface LegalDocumentVersionListView {
   publishedId: string | null;
 }
 
-/** `POST /legal-documents/:type/versions` */
+/**
+ * `POST /legal-documents/:type/versions` — ส่งข้อมูลของทุกรูปแบบที่มีได้ (ฟอร์มเก็บค่าที่สลับไปมาไว้) · ตรวจเฉพาะรูปแบบที่เลือก ·
+ * `imageIds` = ลำดับแสดง · id ต้องเป็นรูป staged ของผู้บันทึก (scope `LEGAL`) หรือรูปของเวอร์ชันนี้ (แก้ไข)
+ */
 export interface LegalDocumentVersionCreateBody {
   version: string;
-  contentHtml: string;
+  contentType: LegalContentType;
+  contentHtml?: string;
+  linkUrl?: string | null;
+  imageIds?: string[];
 }
 
 /** `PATCH /legal-documents/:type/versions/:id` — `expectedUpdatedAt` = ค่า `updatedAt` ตอนเปิดฟอร์ม (คนอื่นแก้คั่นกลาง = 409 `LEGAL_DOCUMENT_STALE`) */
 export interface LegalDocumentVersionUpdateBody {
   version?: string;
+  contentType?: LegalContentType;
   contentHtml?: string;
+  linkUrl?: string | null;
+  /** ส่ง = ชุดรูปทั้งหมดตามลำดับ (รูปเดิมที่ไม่อยู่ = ลบ) · ไม่ส่ง = รูปเดิม */
+  imageIds?: string[];
   expectedUpdatedAt: string;
 }
 
@@ -92,6 +142,12 @@ export interface LegalDocumentPublishResultView {
 export interface PublicLegalDocumentView {
   type: LegalDocumentType;
   version: string;
+  contentType: LegalContentType;
+  /** `TEXT` เท่านั้น · รูปแบบอื่น = `''` */
   contentHtml: string;
+  /** `IMAGES` เท่านั้น (ลำดับแสดง · `name` = `null`) · รูปแบบอื่น = `[]` */
+  images: ContentImageView[];
+  /** `LINK` เท่านั้น · รูปแบบอื่น = `null` */
+  linkUrl: string | null;
   publishedAt: string;
 }
