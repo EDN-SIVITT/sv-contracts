@@ -324,10 +324,12 @@ export interface FundraisingOptionsResponse {
 // ── ไอคอนกองทุน/แคมเปญ (`SV-CR-018` §3 · FT-18 `REQ-FND-019` · SV-ADR-136 · `T-188`) ─────────────────────
 
 /**
- * ย่อเป็นจัตุรัส 256×256 แบบ contain พื้นโปร่ง (PNG) ผ่าน sharp — ตัวย่อเดียวกับไอคอนช่องทางติดต่อ (คนละขนาด · ไอคอนช่องทาง/กลุ่มยัง 128) ·
- * **ไม่รับ SVG** (ตรวจชนิดจากเนื้อไฟล์ ไม่เชื่อ MIME ที่ประกาศ) · ไม่มีไอคอนของโปรแกรม (ผู้บริจาคไม่เห็นชั้นโปรแกรม)
+ * ด้านของจัตุรัสที่เก็บ — sharp **cover (กลางภาพ) ≤ 512 px WebP** (`SV-CR-026` §1 · SV-ADR-164: รูปเต็มกรอบ คมบนหน้า LINE OA ที่แสดงใหญ่ขึ้น · เดิม 256 contain PNG พื้นโปร่ง) ·
+ * ตัวตรวจเดียวกับไอคอนช่องทางติดต่อ (ไอคอนช่องทาง/กลุ่มยัง 128 contain PNG) · **ไม่รับ SVG** (ตรวจชนิดจากเนื้อไฟล์) · ไม่มีไอคอนของโปรแกรม (ผู้บริจาคไม่เห็นชั้นโปรแกรม)
  */
-export const FUNDRAISING_ICON_PX = 256;
+export const FUNDRAISING_ICON_PX = 512;
+/** popup ตัดรูปของเว็บ: ผลที่ 512 px เกิน `FUNDRAISING_ICON_MAX_BYTES` → ตัดใหม่ที่ขนาดนี้ (`T-201` · SV-ADR-148) */
+export const FUNDRAISING_ICON_FALLBACK_PX = 256;
 /** ขนาดที่แนะนำให้ผู้ใช้เตรียม (คำแนะนำในฟอร์ม — คมบนจอ 2–3x ของหน้า LINE OA) */
 export const FUNDRAISING_ICON_RECOMMENDED_PX = 512;
 export const FUNDRAISING_ICON_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
