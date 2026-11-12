@@ -1,5 +1,6 @@
-import type { ChatMessageSender } from './chat';
+import type { ChatCardContent, ChatMessageSender } from './chat';
 import type { DonorView } from './donors';
+import { ErrorCode } from './errors';
 
 /**
  * แผงผู้บริจาคในหน้า Chat (CMS · `SV-CR-013` · SV-ADR-108/109 · `T-158`) — module `chat-donor` ของ e-Donation (Chat ของฐานไม่รู้จักผู้บริจาค)
@@ -133,4 +134,44 @@ export interface ChatNoteView {
   updatedBy: ChatMessageSender | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * หน้า LIFF ที่ปุ่ม "เชื่อมต่อบัญชี" เปิด = หน้า "บัญชีของฉัน" (ปุ่ม profile ของ rich menu · `https://liff.line.me/<LIFF ID>/profile`) —
+ * ยังไม่เชื่อม → หน้า LIFF พาไปเชื่อมบัญชี/สมัคร · เชื่อมแล้ว → บัญชีของฉัน (`SV-CR-032` · SV-ADR-172)
+ */
+export const ACCOUNT_LINK_LIFF_PAGE = 'profile';
+
+/** LIFF URL ของหน้าเชื่อมบัญชี — `liffId` ว่าง = `null` */
+export function accountLinkLiffUrl(liffId: string | null | undefined): string | null {
+  const id = (liffId ?? '').trim();
+  return id ? `https://liff.line.me/${encodeURIComponent(id)}/${ACCOUNT_LINK_LIFF_PAGE}` : null;
+}
+
+/** เหตุที่ส่งการ์ดชวนเชื่อมบัญชีไม่ได้ (ค่า = `ErrorCode` ที่ `POST` ตอบ · หน้าเว็บแปลด้วย `errorMessageKey`) */
+export const ChatLinkInviteBlockedReason = {
+  /** ยังไม่ตั้ง LIFF ID (ตั้งค่า → LINE) — 422 */
+  LIFF_NOT_CONFIGURED: ErrorCode.SHARE_LINK_LIFF_NOT_CONFIGURED,
+  /** แม่แบบ `account_link_invite` ไม่มี/ผิดรูป (ตั้งค่า → ข้อความอัตโนมัติ · ยังไม่รัน `0063`) — 503 */
+  TEMPLATE_NOT_CONFIGURED: ErrorCode.MESSAGE_TEMPLATE_NOT_CONFIGURED,
+  /** LINE ของห้องเชื่อมกับผู้บริจาคแล้ว (เชื่อมเองจาก LINE OA ระหว่างนั้น) — 409 */
+  ALREADY_LINKED: ErrorCode.DONOR_ALREADY_LINKED,
+} as const;
+export type ChatLinkInviteBlockedReason = (typeof ChatLinkInviteBlockedReason)[keyof typeof ChatLinkInviteBlockedReason];
+
+/**
+ * `GET /chat/threads/:id/link-invite` (`chat` R + `donors` R · `SV-CR-032` §1 §2) — ตัวอย่างการ์ดที่จะส่ง + ลิงก์สำหรับปุ่ม "แชร์" ·
+ * ไม่ส่ง · ไม่ audit · `blocked` = เหตุแรกที่ส่งไม่ได้ (ลำดับ: เชื่อมแล้ว → LIFF → แม่แบบ) · ห้องไม่มี LINE user ID = 422 `VALIDATION_FAILED`
+ */
+export interface ChatLinkInviteView {
+  /** LIFF URL หน้าเชื่อมบัญชี (`accountLinkLiffUrl`) · `null` = ยังไม่ตั้ง LIFF ID */
+  url: string | null;
+  /** การ์ดที่ render ด้วยชื่อ LINE ของห้องแล้ว · `null` = แม่แบบใช้ไม่ได้ หรือยังไม่มี `url` */
+  card: ChatCardContent | null;
+  blocked: ChatLinkInviteBlockedReason | null;
+}
+
+/** body ของ `POST /chat/threads/:id/link-invite` — `clientMessageId` เดิมภายใน 24 ชม. = คืนข้อความเดิม ไม่ส่งซ้ำ (SV-ADR-041) */
+export interface ChatLinkInviteInput {
+  clientMessageId?: string;
 }

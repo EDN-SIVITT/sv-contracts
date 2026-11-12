@@ -72,6 +72,19 @@ const text = (
   ...(placeholders ? { placeholders } : {}),
 });
 
+const line = (
+  name: string,
+  maxLength: number,
+  placeholders?: readonly string[],
+): MessageTemplateFieldSpec => ({ ...text(name, maxLength, placeholders), kind: MessageTemplateFieldKind.LINE });
+
+/** หัวข้อการ์ดชวนเชื่อมบัญชี — สั้นพอให้อ่านจบในการ์ด (Flex ไม่มีเพดานของตัวเอง · กำหนดเองเพื่อไม่ให้การ์ดยาวเกิน) */
+export const ACCOUNT_LINK_INVITE_TITLE_MAX = 100;
+/** ข้อความเชิญชวนในการ์ด */
+export const ACCOUNT_LINK_INVITE_BODY_MAX = 1000;
+/** ตัวแปรของการ์ดชวนเชื่อมบัญชี — `{name}` = ชื่อ LINE ของคู่สนทนา (ไม่มี = ว่าง) */
+export const ACCOUNT_LINK_INVITE_PLACEHOLDERS = ['name'] as const;
+
 export const MESSAGE_TEMPLATE_DEFINITIONS: readonly MessageTemplateDefinition[] = [
   {
     // SV-ADR-014 (`Q-008`) — ส่งเป็น reply เมื่อมีคนเพิ่ม OA เป็นเพื่อน · body ว่าง = ไม่ส่ง
@@ -79,6 +92,18 @@ export const MESSAGE_TEMPLATE_DEFINITIONS: readonly MessageTemplateDefinition[] 
     channels: [LineChannel.MAIN],
     flex: false,
     fields: [{ ...text('body', LINE_TEXT_MAX), optional: true }],
+  },
+  {
+    // `SV-CR-032` §2 · SV-ADR-172 — Flex 1 bubble (หัวข้อ · ข้อความ · ปุ่ม) ส่งจากแผงผู้บริจาคของ Chat · seed `0063`
+    key: MessageTemplateKey.ACCOUNT_LINK_INVITE,
+    channels: [LineChannel.MAIN],
+    flex: true,
+    fields: [
+      line('altText', LINE_ALT_TEXT_MAX, ACCOUNT_LINK_INVITE_PLACEHOLDERS),
+      line('title', ACCOUNT_LINK_INVITE_TITLE_MAX, ACCOUNT_LINK_INVITE_PLACEHOLDERS),
+      text('body', ACCOUNT_LINK_INVITE_BODY_MAX, ACCOUNT_LINK_INVITE_PLACEHOLDERS),
+      line('buttonLabel', LINE_BUTTON_LABEL_MAX),
+    ],
   },
 ];
 

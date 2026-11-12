@@ -15,6 +15,11 @@ export const LINE_CHANNELS = [LineChannel.MAIN] as const;
 export const MessageTemplateKey = {
   /** ข้อความต้อนรับเมื่อผู้ใช้เพิ่ม OA เป็นเพื่อน (event `follow`) — ข้อความล้วน (`Q-008`) */
   WELCOME: 'welcome',
+  /**
+   * การ์ดชวนเชื่อมบัญชี LINE กับข้อมูลผู้บริจาค (Flex · `SV-CR-032` §2 · SV-ADR-172) — ส่งเมื่อเจ้าหน้าที่กด "ส่งปุ่มเชื่อมต่อบัญชี" ในแผงผู้บริจาคของ Chat ·
+   * ปุ่ม = LIFF URL หน้า "บัญชีของฉัน" (`https://liff.line.me/<LIFF ID>/profile`)
+   */
+  ACCOUNT_LINK_INVITE: 'account_link_invite',
 } as const;
 export type MessageTemplateKey = (typeof MessageTemplateKey)[keyof typeof MessageTemplateKey];
 

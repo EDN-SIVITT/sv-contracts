@@ -270,6 +270,76 @@ export interface ChatSendResultView {
   messages: ChatMessageView[];
 }
 
+/**
+ * แบบของการ์ด (ข้อความ `CARD` · `SV-CR-032` · SV-ADR-172) — ระบบฐานรู้จักแค่โครงการ์ด · ระบบลูกเพิ่มแบบได้
+ * `ACCOUNT_LINK_INVITE` = ชวนเชื่อมบัญชี LINE กับข้อมูลผู้บริจาค (`POST /chat/threads/:id/link-invite`)
+ */
+export const ChatCardKind = {
+  ACCOUNT_LINK_INVITE: 'ACCOUNT_LINK_INVITE',
+} as const;
+export type ChatCardKind = (typeof ChatCardKind)[keyof typeof ChatCardKind];
+
+/**
+ * การ์ดที่ render แล้ว (ตัวแปรแทนค่าแล้ว) — ตัวอย่างในหน้ายืนยันของ CMS และ `payload` ของข้อความ `CARD` ใช้โครงเดียวกัน ·
+ * LINE ได้ Flex 1 bubble: `title` ตัวหนา · `body` · ปุ่ม `buttonLabel` เปิด `url` · `altText` = ข้อความแจ้งเตือน/ตัวอย่างในรายการแชท
+ */
+export interface ChatCardContent {
+  altText: string;
+  title: string;
+  body: string;
+  buttonLabel: string;
+  url: string;
+}
+
+/** `chat_messages.payload` ของข้อความ `CARD` */
+export interface ChatCardPayload extends ChatCardContent {
+  card: string;
+  clientMessageId?: string;
+}
+
+const CARD_TEXT_FIELDS = ['altText', 'title', 'body', 'buttonLabel', 'url'] as const;
+
+/** payload ของข้อความ `CARD` — ชนิดอื่น/โครงไม่ครบ (ข้อมูลเก่า · แก้มือ) = `null` (UI แสดงแบบข้อความที่ยังไม่รองรับ) */
+export function chatCardOf(message: Pick<ChatMessageView, 'messageType' | 'payload'>): ChatCardPayload | null {
+  if (message.messageType !== ChatMessageType.CARD || !message.payload) return null;
+  const payload = message.payload;
+  if (typeof payload.card !== 'string') return null;
+  for (const field of CARD_TEXT_FIELDS) if (typeof payload[field] !== 'string') return null;
+  return payload as unknown as ChatCardPayload;
+}
+
+/** เหตุที่ไม่มีลิงก์เพิ่มเพื่อน — `NOT_CONFIGURED` = ยังไม่กรอก Basic ID · `INVALID` = รูปแบบผิด (ตั้งค่า → LINE) */
+export const ChatAddFriendProblem = {
+  NOT_CONFIGURED: 'NOT_CONFIGURED',
+  INVALID: 'INVALID',
+} as const;
+export type ChatAddFriendProblem = (typeof ChatAddFriendProblem)[keyof typeof ChatAddFriendProblem];
+
+/**
+ * `GET /chat/add-friend?channel=` (`chat` READ_ONLY · `SV-CR-032` §3 · `REQ-CHT-037`) — LINE ID + ลิงก์เพิ่มเพื่อนของ OA จาก `line.<channel>.basicId` ·
+ * หน้า Chat สร้าง QR ของ `url` เอง (`lib/qr-code.ts`) · ข้อมูลสาธารณะ (ผู้ใช้ทั่วไปค้น OA ด้วยค่าเดียวกัน)
+ */
+export interface ChatAddFriendView {
+  channel: LineChannel;
+  /** `@xxxx` เสมอ (ตั้งไว้ไม่มี `@` = เติมให้) · `null` = ยังไม่ตั้ง/รูปแบบผิด (`problem`) */
+  basicId: string | null;
+  /** `https://line.me/R/ti/p/%40xxxx` (รูปแบบเดียวกับช่องทางติดต่อ LINE `@id`) · `null` เมื่อ `basicId` เป็น `null` */
+  url: string | null;
+  problem: ChatAddFriendProblem | null;
+}
+
+/** Basic ID / Premium ID ของ LINE OA (ไม่รวม `@`) — ตัวอักษรชุดเดียวกับ LINE ID ของช่องทางติดต่อ */
+const LINE_OA_ID = /^[A-Za-z0-9._-]{1,50}$/;
+
+/** ค่าดิบของ `line.<channel>.basicId` → LINE ID + ลิงก์เพิ่มเพื่อน (`@` นำหน้ามี/ไม่มีก็ได้ · ช่องว่างหัวท้ายตัดทิ้ง) */
+export function lineAddFriend(raw: string | null | undefined): Omit<ChatAddFriendView, 'channel'> {
+  const id = (raw ?? '').trim().replace(/^@+/, '');
+  if (!id) return { basicId: null, url: null, problem: ChatAddFriendProblem.NOT_CONFIGURED };
+  if (!LINE_OA_ID.test(id)) return { basicId: null, url: null, problem: ChatAddFriendProblem.INVALID };
+  const basicId = `@${id}`;
+  return { basicId, url: `https://line.me/R/ti/p/${encodeURIComponent(basicId)}`, problem: null };
+}
+
 /** `GET /chat/threads/:id/messages` — ขนาดหน้าเริ่มต้น/สูงสุด (`REQ-CHT-013`) */
 export const CHAT_MESSAGE_PAGE_DEFAULT = 50;
 export const CHAT_MESSAGE_PAGE_MAX = 100;

@@ -10,6 +10,11 @@ export const ChatMessageType = {
   TEXT: 'TEXT',
   IMAGE: 'IMAGE',
   STICKER: 'STICKER',
+  /**
+   * การ์ด (LINE Flex) ที่ระบบส่งจาก CMS — ขาออกเท่านั้น (`SV-CR-032` · SV-ADR-172) · `body` = altText · `payload` = `ChatCardPayload` (การ์ดที่ส่งจริง)
+   * ตอนนี้มีแบบเดียว: ชวนเชื่อมบัญชี (`ChatCardKind.ACCOUNT_LINK_INVITE`)
+   */
+  CARD: 'CARD',
   UNKNOWN: 'UNKNOWN',
 } as const;
 export type ChatMessageType = (typeof ChatMessageType)[keyof typeof ChatMessageType];
