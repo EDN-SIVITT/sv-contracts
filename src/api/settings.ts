@@ -103,6 +103,11 @@ export const SettingKey = {
   /** ข้อความเมื่อปิดสมัครเองแล้วไม่พบเบอร์ (th/en · บังคับ ≤ 500) — `REQ-SET-035` · แสดงใต้ switch ในหน้าตั้งค่า */
   DONOR_SELF_REGISTRATION_DISABLED_MESSAGE_TH: 'donor.selfRegistrationDisabledMessageTh',
   DONOR_SELF_REGISTRATION_DISABLED_MESSAGE_EN: 'donor.selfRegistrationDisabledMessageEn',
+  /**
+   * ถาม "ยืนยันตัวตนอีกขั้น" ก่อนเชื่อม LINE กับผู้บริจาคเดิมที่มีประวัติ (ค่าเริ่มต้น `false` = เบอร์ + OTP อย่างเดียว) —
+   * `REQ-SET-059` · `REQ-DNL-022` · SV-ADR-173 · ไม่มีแถว (ยังไม่รัน `0064`) = `false`
+   */
+  DONOR_LINK_IDENTITY_CHECK_ENABLED: 'donor.linkIdentityCheckEnabled',
   /** ข้อความขอความยินยอม (PDPA) ที่ผู้บริจาคต้องยอมรับก่อนผูก/สร้าง (th/en · บังคับ ≤ 5000 · หลายบรรทัด) — `REQ-SET-036` · `REQ-DNL-004` */
   DONOR_CONSENT_TEXT_TH: 'donor.consentTextTh',
   DONOR_CONSENT_TEXT_EN: 'donor.consentTextEn',
