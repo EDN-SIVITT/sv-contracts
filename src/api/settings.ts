@@ -227,6 +227,9 @@ export const SettingKey = {
    * ปิด = ผู้บริจาคสลับหน้าผ่าน rich menu ของ LINE OA (LIFF URL 4 เมนู) · `SV-CR-023` §1 · SV-ADR-155 · `0057`
    */
   LIFF_BOTTOM_NAV_ENABLED: 'liff.bottomNavEnabled',
+  LIFF_TOP_BAR_ENABLED: 'liff.topBarEnabled',
+  LIFF_DONOR_MODE: 'liff.donorMode',
+  LIFF_PRIMARY_CAMPAIGN_ID: 'liff.primaryCampaignId',
 } as const;
 export type SettingKey = (typeof SettingKey)[keyof typeof SettingKey];
 
@@ -413,6 +416,7 @@ export const SETTING_STRING_RULES: Readonly<Record<string, SettingStringRule>> =
   // SV-ADR-128 — โหมด "อ่านแล้ว" ใน LINE: ค่านอกชุด = 422 `INVALID_FORMAT`
   [SettingKey.CHAT_LINE_READ_RECEIPT_MODE]: { required: true, maxChars: 20, allowedValues: CHAT_LINE_READ_RECEIPT_MODES },
   // SV-ADR-132 — ภาษาหลักของหน้า LINE OA: ต้องมีค่าเสมอ (ปิดปุ่มภาษาแล้วต้องรู้ว่าใช้ภาษาไหน) · ค่านอกชุด = 422 `INVALID_FORMAT`
+  [SettingKey.LIFF_DONOR_MODE]: { required: true, maxChars: 6, allowedValues: ['MULTI', 'SINGLE'] },
   [SettingKey.LIFF_DEFAULT_LOCALE]: { required: true, maxChars: 2, allowedValues: LIFF_LOCALES },
 };
 
@@ -475,6 +479,7 @@ export function settingStringProblem(key: string, value: string): SettingStringP
  */
 export const MANAGED_SETTING_KEYS: readonly string[] = [
   SettingKey.GENERAL_SYSTEM_ICON,
+  SettingKey.LIFF_PRIMARY_CAMPAIGN_ID,
   // SV-ADR-132 — รูปธีมหน้า LINE OA (`/settings/liff/images/:slot`)
   SettingKey.LIFF_PROFILE_COVER_IMAGE,
   SettingKey.LIFF_PAGE_BACKGROUND_IMAGE,

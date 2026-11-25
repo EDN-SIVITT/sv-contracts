@@ -73,7 +73,27 @@ export interface LiffFundOption {
 }
 
 /** เรียง: (ชั้นโปรแกรมเปิด) ชื่อโปรแกรม → ชื่อกองทุน → id · แคมเปญ: ปักหมุด (`displayRank`) ก่อน → วันสิ้นสุดใกล้ก่อน (null ท้าย) → ชื่อ → id · `today` = วันนี้ของ Bangkok (ค่าเริ่มต้นวันโอน + ห้ามอนาคต) */
+export const LiffDonorMode = { MULTI: 'MULTI', SINGLE: 'SINGLE' } as const;
+export type LiffDonorMode = (typeof LiffDonorMode)[keyof typeof LiffDonorMode];
+
+/**
+ * ตั้งค่า → รูปแบบการรับบริจาค (`T-256` · SV-ADR-175) — `GET|PUT /settings/liff/donor-mode` (สิทธิ์ `settings` READ_ONLY ดู · MAINTAIN บันทึก)
+ * `primaryCampaignId` = แคมเปญหลักของโหมดกองทุนเดี่ยว · MULTI ไม่ล้างค่าเดิม (สลับกลับแล้วยังจำ)
+ */
+export interface LiffDonorModeSettingsView {
+  donorMode: LiffDonorMode;
+  primaryCampaignId: string | null;
+}
+
+/** `PUT /settings/liff/donor-mode` — SINGLE ต้องส่ง `primaryCampaignId` (แคมเปญที่ยังไม่ถูกลบ) · MULTI ไม่ต้องส่ง */
+export interface LiffDonorModeUpdateRequest {
+  donorMode: LiffDonorMode;
+  primaryCampaignId?: string | null;
+}
+
 export interface LiffDonateOptionsView {
+  donorMode?: LiffDonorMode;
+  primaryCampaignId?: string | null;
   programEnabled: boolean;
   today: string;
   funds: LiffFundOption[];
@@ -157,6 +177,7 @@ export interface LiffSouvenirCardView {
 
 /** `campaigns` = แคมเปญที่มีของในแคตตาล็อกอย่างน้อย 1 ชิ้น (ชิปกรอง) · การ์ดเรียงชื่อ → id */
 export interface LiffSouvenirCatalogView {
+  donorMode?: LiffDonorMode;
   campaigns: { id: string; name: string; fundName: string }[];
   items: LiffSouvenirCardView[];
 }

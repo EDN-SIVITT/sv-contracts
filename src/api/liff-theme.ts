@@ -75,6 +75,7 @@ export interface BrandingLiffView {
   defaultLocale: LiffLocale;
   /** แสดงแถบเมนูล่าง 4 ปุ่ม (`liff.bottomNavEnabled` · ค่าเริ่มต้นปิด) */
   bottomNavEnabled: boolean;
+  topBarEnabled: boolean;
   profileCover: { version: string } | null;
   pageBackground: { version: string } | null;
 }
@@ -83,6 +84,7 @@ export const BRANDING_LIFF_DEFAULTS: BrandingLiffView = {
   languageSwitcherEnabled: LIFF_LANGUAGE_SWITCHER_DEFAULT_ENABLED,
   defaultLocale: LIFF_DEFAULT_LOCALE,
   bottomNavEnabled: LIFF_BOTTOM_NAV_DEFAULT_ENABLED,
+  topBarEnabled: true,
   profileCover: null,
   pageBackground: null,
 };
@@ -118,6 +120,7 @@ export function readBrandingLiff(raw: unknown): BrandingLiffView {
     languageSwitcherEnabled: readLiffLanguageSwitcherEnabled(value.languageSwitcherEnabled),
     defaultLocale: readLiffDefaultLocale(value.defaultLocale),
     bottomNavEnabled: readLiffBottomNavEnabled(value.bottomNavEnabled),
+    topBarEnabled: value.topBarEnabled !== false,
     profileCover: image(value.profileCover),
     pageBackground: image(value.pageBackground),
   };

@@ -8,7 +8,7 @@ import { formatSequenceCode } from './sequence-code';
  * enum / view / input / ค่าคงที่ที่ API และหน้าเว็บใช้ร่วมกัน — ห้ามประกาศซ้ำฝั่งใดฝั่งหนึ่ง
  */
 
-/** สถานะสินค้า — `SUSPENDED` = เลือกใส่ออเดอร์ใหม่ไม่ได้ · ยืนยันออเดอร์ที่มีสินค้านี้ไม่ได้ (422 `SOUVENIR_SUSPENDED`) · สต็อกยังจัดการได้ */
+/** สถานะสินค้า — `SUSPENDED` = เลือกใส่ออเดอร์ใหม่ไม่ได้ · ยืนยันออเดอร์ที่มีสินค้านี้ไม่ได้ (422 `SOUVENIR_SUSPENDED`) · รับเข้าและปรับสต็อกด้วยตนเองไม่ได้ */
 export const SouvenirStatus = {
   ACTIVE: 'ACTIVE',
   SUSPENDED: 'SUSPENDED',

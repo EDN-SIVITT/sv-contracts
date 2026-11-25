@@ -286,6 +286,7 @@ export interface CampaignSummaryView extends FundraisingListItemBase {
 /** แถวของ `GET /campaigns` */
 export interface CampaignListItemView extends CampaignSummaryView {
   lineOa: CampaignLineOaView;
+  isPrimary?: boolean;
 }
 
 /** `GET /campaigns/:id` */
