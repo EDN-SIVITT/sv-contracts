@@ -83,6 +83,17 @@ export const DonationSource = {
 export type DonationSource = (typeof DonationSource)[keyof typeof DonationSource];
 
 /**
+ * ตัวกรองแหล่งที่มาของหน้า list (`GET /donations?source=` · `T-267` · SV-ADR-181) — แยกจาก `DonationSource` (ค่าที่เก็บในแถวไม่เปลี่ยน · รายงานยังใช้ `DonationSource`)
+ * `LINE_OA` ผู้บริจาคแจ้งเอง · `STAFF` เจ้าหน้าที่บันทึกใน CMS (**ไม่รวม**รายการนำเข้า) · `IMPORT` เจ้าหน้าที่นำเข้า .xlsx (`import_batch_id` มีค่า · `SV-CR-035`) — 3 ค่าไม่ทับกัน
+ */
+export const DonationSourceFilter = {
+  LINE_OA: 'LINE_OA',
+  STAFF: 'STAFF',
+  IMPORT: 'IMPORT',
+} as const;
+export type DonationSourceFilter = (typeof DonationSourceFilter)[keyof typeof DonationSourceFilter];
+
+/**
  * วงจรสถานะผ่านปุ่ม (ไม่รวมฟอร์มแก้ไข — `PATCH` ตั้ง PENDING/CONFIRMED/REJECTED ได้เมื่อเป็น PENDING/REJECTED · CONFIRMED ส่งได้แค่ค่าเดิม
  * (อื่น → 409 `DONATION_STATUS_INVALID` · SV-ADR-081) · `ORDERED` แก้ไม่ได้)
  * PENDING → CONFIRMED/REJECTED (ยืนยัน/ปฏิเสธ) · CONFIRMED → ORDERED (ออกออเดอร์) / PENDING (ยกเลิกการยืนยัน · FULL · เหตุผลบังคับ · `T-119`) ·
@@ -379,8 +390,8 @@ export interface DonationListQuery {
   /** id ของกองทุน หรือ `DONATION_FUND_FILTER_NONE` (`'none'`) = ยังไม่ระบุกองทุน (จัดข้อมูลเดิม) — `T-126` */
   fundId?: string;
   campaignId?: string;
-  /** แหล่งที่มา (`SV-CR-017` §5 · `T-183`) — `LINE_OA` ผู้บริจาคแจ้งเองผ่าน LINE OA · `STAFF` เจ้าหน้าที่บันทึกใน CMS · ค่าอื่น = 400 */
-  source?: DonationSource;
+  /** แหล่งที่มา (`SV-CR-017` §5 · `T-183` · 3 ค่า `T-267`) — `DonationSourceFilter` · ค่าอื่น = 400 */
+  source?: DonationSourceFilter;
   page?: number;
   perPage?: number;
 }

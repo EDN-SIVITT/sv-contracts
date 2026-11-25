@@ -177,6 +177,16 @@ export const OrderStockFilter = {
 } as const;
 export type OrderStockFilter = (typeof OrderStockFilter)[keyof typeof OrderStockFilter];
 
+/**
+ * ตัวกรองแหล่งที่มาใน list (`GET /orders?source=` · `T-268` · SV-ADR-181) — `STAFF` เจ้าหน้าที่บันทึกใน CMS (`import_batch_id IS NULL` · สร้างจากเมนูออเดอร์/ออกจากรายการบริจาค) ·
+ * `IMPORT` เจ้าหน้าที่นำเข้า (`import_batch_id` มีค่า · `SV-CR-035`) · ใช้กับ `statusCounts` ด้วย (แบบ `printed`)
+ */
+export const OrderSourceFilter = {
+  STAFF: 'STAFF',
+  IMPORT: 'IMPORT',
+} as const;
+export type OrderSourceFilter = (typeof OrderSourceFilter)[keyof typeof OrderSourceFilter];
+
 /** ความยาวสูงสุดของช่องกรอก — ตรงกับคอลัมน์ใน `0008_souvenirs_orders.sql` (DOM-04) */
 export const ORDER_RECIPIENT_NAME_MAX_LENGTH = 200;
 /** ที่อยู่ผู้รับ snapshot เป็นข้อความหลายบรรทัด — เก็บเสมอ (แบบฟอร์ม → API แปลงด้วย `recipientAddressText` · SV-ADR-057) */
@@ -329,6 +339,8 @@ export interface OrderListQuery {
   printed?: OrderPrintedFilter;
   /** `SHORT` = ออเดอร์ร่างรอของเข้า (`awaitingStock` · SV-ADR-098) */
   stock?: OrderStockFilter;
+  /** แหล่งที่มา (`T-268`) — `STAFF` บันทึกใน CMS · `IMPORT` นำเข้า */
+  source?: OrderSourceFilter;
   /** ลิงก์จากหน้าผู้บริจาค (`/orders?donorId=`) */
   donorId?: string;
   page?: number;
