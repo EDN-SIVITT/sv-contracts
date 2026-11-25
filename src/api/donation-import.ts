@@ -1,8 +1,10 @@
 /**
  * นำเข้ารายการบริจาคเก่าจากไฟล์ .xlsx (`SV-CR-035` §3 · SV-ADR-178 · `T-261` · `T-262`)
  *
- * `POST /donations/import/preview` (multipart `file`) = อ่าน + ตรวจ + จับคู่ผู้บริจาค/ของที่ระลึก **ไม่เขียน DB** → `DonationImportPreview`
- * `POST /donations/import` (multipart `file` + `sha256` จาก preview) = ตรวจซ้ำทั้งไฟล์ → เขียนทั้งไฟล์ใน transaction เดียว → `DonationImportResult`
+ * `POST /donations/import/preview` (multipart `file` + `campaignId`) = อ่าน + ตรวจ + จับคู่ผู้บริจาค/ของที่ระลึก **ไม่เขียน DB** → `DonationImportPreview`
+ * `POST /donations/import` (multipart `file` + `sha256` จาก preview + `campaignId`) = ตรวจซ้ำทั้งไฟล์ → เขียนทั้งไฟล์ใน transaction เดียว → `DonationImportResult`
+ * `campaignId` (บังคับ · `T-265` · SV-ADR-180) = แคมเปญของ**ทุกรายการ**ในไฟล์ (กองทุน = กองทุนของแคมเปญ) — กติกาเดียวกับเลือกในฟอร์ม: เปิดใช้งานทั้งสาย ·
+ *   ไม่ส่ง/รูปแบบผิด 400 · ไม่พบ/ลบ/ปิด 422 `DONATION_CAMPAIGN_UNAVAILABLE` · กองทุน/โปรแกรมปิด 422 `DONATION_FUND_UNAVAILABLE` · ย้ายกองทุนระหว่างยืนยัน 422 `DONATION_CAMPAIGN_FUND_MISMATCH`
  * สิทธิ์: donations FULL + orders MAINTAIN + donors MAINTAIN · ไฟล์ ≤ `DONATION_IMPORT_MAX_BYTES` · แถว ≤ `DONATION_IMPORT_MAX_ROWS`
  * ผล: ผู้บริจาค (จับเบอร์ · มีแล้วไม่แก้) · รายการบริจาค (`ORDERED` มีของ / `CONFIRMED` ไม่มีของ) · ออเดอร์ `COMPLETED` · เวลาทุกขั้น = `timestamp` ของแถว
  */
@@ -169,7 +171,22 @@ export interface DonationImportSummary {
   warnings: number;
 }
 
+/** ชื่อของกองทุน/แคมเปญ/โปรแกรมในหน้า review */
+export interface DonationImportFundraisingName {
+  id: string;
+  code: string | null;
+  name: string;
+}
+
+/** แคมเปญที่ทุกรายการในไฟล์จะผูก (`T-265`) — `program` = `null` เมื่อชั้นโปรแกรมปิด (SV-ADR-090) หรือกองทุนยังไม่จัดโปรแกรม */
+export interface DonationImportCampaign extends DonationImportFundraisingName {
+  fund: DonationImportFundraisingName;
+  program: DonationImportFundraisingName | null;
+}
+
 export interface DonationImportPreview {
+  /** แคมเปญที่เลือก (ตรวจแล้วว่าเลือกได้) — ยืนยันต้องส่ง `campaignId` เดิม */
+  campaign: DonationImportCampaign;
   fileName: string | null;
   /** SHA-256 hex ของไฟล์ — ส่งกลับมาตอนยืนยัน */
   sha256: string;
