@@ -1,4 +1,4 @@
-import type { DonationSource, DonationStatus, SlipFileKind } from './donations';
+import type { DonationEvidenceKind, DonationSource, DonationStatus, SlipFileKind } from './donations';
 import type { SouvenirEligibilityMode } from './fundraising-souvenirs';
 import type { OrderStatus } from './orders';
 import type { SouvenirImageView } from './souvenirs';
@@ -258,6 +258,13 @@ export interface LiffSlipFileView {
   version: string;
 }
 
+/** หลักฐานแบบลิงก์/ข้อความ 1 แถว (`donation_evidence_entries`) — ลิงก์เปิดแท็บใหม่ */
+export interface LiffEvidenceEntryView {
+  id: string;
+  kind: DonationEvidenceKind;
+  value: string;
+}
+
 export interface LiffRecipientView {
   name: string;
   /** แสดงผลแบบมีขีด */
@@ -274,6 +281,10 @@ export interface LiffDonationDetailView extends LiffDonationListItem {
   /** หมายเหตุที่ผู้บริจาคเขียนเอง (`source = LINE_OA` เท่านั้น · รายการของเจ้าหน้าที่ = `null` เสมอ) */
   note: string | null;
   slips: LiffSlipFileView[];
+  /** หลักฐานแบบลิงก์/ข้อความที่เจ้าหน้าที่เพิ่ม (`SV-CR-035` §1) เรียงตามฟอร์ม · `[]` = ไม่มี — แสดงต่อจากรูป */
+  evidenceEntries: LiffEvidenceEntryView[];
+  /** ข้อมูลประกอบจากเจ้าหน้าที่ — **เฉพาะที่เปิดให้ผู้บริจาคเห็น** (ปิด/ไม่มี = `null` · API ไม่ส่งค่าเลย · `SV-CR-035` §2) */
+  additionalInfo: string | null;
   items: LiffOrderItemView[];
   recipient: LiffRecipientView | null;
   /** การจัดส่งที่ออกจากรายการนี้ (ไม่รวมที่ลบ) เรียงชุด → ใบที่ */

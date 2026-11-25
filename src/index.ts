@@ -26,6 +26,7 @@ export * from './api/orders';
 export * from './api/shipping-carriers';
 export * from './api/money';
 export * from './api/donations';
+export * from './api/donation-import';
 export * from './api/fundraising';
 export * from './api/fundraising-souvenirs';
 export * from './api/fundraising-content';

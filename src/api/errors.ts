@@ -325,6 +325,11 @@ export const ErrorCode = {
   NEWS_PUBLISHED_LOCKED: 'NEWS_PUBLISHED_LOCKED',
   /** เผยแพร่ข่าวที่ยังไม่มีเนื้อหา (0 cell) — 422 */
   NEWS_CONTENT_REQUIRED: 'NEWS_CONTENT_REQUIRED',
+  // ── นำเข้ารายการบริจาคจาก .xlsx (`SV-CR-035` §3 · SV-ADR-178) ──
+  /** ไฟล์นำเข้าอ่านไม่ได้/ผิดรูปแบบ (ไม่ใช่ .xlsx · ไม่มีหัวตารางที่ต้องมี · ไม่มีแถว · เกินเพดาน) — 422 `details { issues: DonationImportIssue[] }` */
+  DONATION_IMPORT_INVALID: 'DONATION_IMPORT_INVALID',
+  /** ยืนยันนำเข้าด้วยไฟล์ที่ไม่ใช่ไฟล์ที่ตรวจไว้ (`sha256` ไม่ตรง) หรือข้อมูลมีแถวผิด — 409 `details { expected, actual }` · ตรวจไฟล์ใหม่ก่อน */
+  DONATION_IMPORT_FILE_MISMATCH: 'DONATION_IMPORT_FILE_MISMATCH',
   /** ใช้กับ validation error ทั่วไปที่ไม่มี code เฉพาะ */
   VALIDATION_FAILED: 'VALIDATION_FAILED',
   NOT_FOUND: 'NOT_FOUND',

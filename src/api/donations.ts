@@ -64,6 +64,8 @@ export const DonationPaymentField = {
   DONOR_ID: 'donorId',
   SLIP_NOTE: 'slipNote',
   SLIP_FILES: 'slipFiles',
+  /** หลักฐานแบบลิงก์/ข้อความ (`evidenceEntries` · `SV-CR-035` · SV-ADR-176) — แทนทั้งชุดผ่าน `POST`/`PATCH` */
+  EVIDENCE_ENTRIES: 'evidenceEntries',
 } as const;
 export type DonationPaymentField = (typeof DonationPaymentField)[keyof typeof DonationPaymentField];
 
@@ -198,6 +200,48 @@ export const PAYMENT_SLIP_PDF_MIME = 'application/pdf';
 export const PAYMENT_SLIP_MIME_TYPES = [...DONATION_SLIP_MIME_TYPES, PAYMENT_SLIP_PDF_MIME] as const;
 /** ไฟล์หลักฐานการโอนสูงสุดต่อรายการ/ออเดอร์ — ใบที่เกิน → 422 `reason: 'TOO_MANY'` `details { max }` (นับใต้ล็อกแถวแม่) */
 export const PAYMENT_SLIP_FILES_MAX = 10;
+
+// ── หลักฐานแบบลิงก์/ข้อความ + ข้อมูลประกอบ (`SV-CR-035` §1–2 · SV-ADR-176/177 · `T-260`) ─────────────────────
+
+/** ชนิดหลักฐานที่ไม่ใช่ไฟล์ (`donation_evidence_entries.kind`) — `LINK` URL http(s) (เช่น ไฟล์ใน Google Drive) · `TEXT` ข้อความ · รูป/PDF = `PaymentSlipFileView` (ตารางเดิม) */
+export const DonationEvidenceKind = {
+  LINK: 'LINK',
+  TEXT: 'TEXT',
+} as const;
+export type DonationEvidenceKind = (typeof DonationEvidenceKind)[keyof typeof DonationEvidenceKind];
+export const DONATION_EVIDENCE_KINDS = Object.values(DonationEvidenceKind) as readonly DonationEvidenceKind[];
+/** แถวลิงก์/ข้อความต่อรายการ (แยกจากเพดานไฟล์ `PAYMENT_SLIP_FILES_MAX`) */
+export const DONATION_EVIDENCE_ENTRIES_MAX = 10;
+export const DONATION_EVIDENCE_LINK_MAX_LENGTH = 2000;
+export const DONATION_EVIDENCE_TEXT_MAX_LENGTH = 1000;
+/** "ข้อมูลประกอบ" (`donations.additional_info`) */
+export const DONATION_ADDITIONAL_INFO_MAX_LENGTH = 2000;
+
+/** URL ที่รับเป็นหลักฐานแบบลิงก์ — `http://` หรือ `https://` + host · ไม่มีช่องว่าง · ตรวจหลัง trim (เว็บ + API ใช้ตัวเดียวกัน) */
+export function isEvidenceLink(value: string): boolean {
+  const text = value.trim();
+  if (!/^https?:\/\/[^\s/?#]+[^\s]*$/i.test(text)) return false;
+  try {
+    const url = new URL(text);
+    return (url.protocol === 'http:' || url.protocol === 'https:') && url.hostname.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/** 1 แถวใน body (`evidenceEntries`) — ลำดับใน array = ลำดับแสดง · `value` trim แล้วต้องไม่ว่าง (เว็บตัดแถวว่างทิ้งก่อนส่ง) */
+export interface DonationEvidenceEntryInput {
+  kind: DonationEvidenceKind;
+  value: string;
+}
+
+/** หลักฐานแบบลิงก์/ข้อความ 1 แถว — เรียง `sort_order, id` */
+export interface DonationEvidenceEntryView {
+  id: string;
+  kind: DonationEvidenceKind;
+  value: string;
+  createdAt: string;
+}
 
 /**
  * ไฟล์หลักฐานการโอน 1 ไฟล์ (`donation_slip_files` / `order_slip_files` · `0023`) — เรียง `sort_order, id` (ตามลำดับอัปโหลด) · ไม่มี storage key
@@ -385,6 +429,8 @@ export interface DonationListItemView {
   souvenirTotalThreshold: string;
   /** มีไฟล์หลักฐานการโอนอย่างน้อย 1 ไฟล์ (ไอคอนในคอลัมน์สถานะ · EXISTS `donation_slip_files`) */
   hasSlip: boolean;
+  /** ชุดนำเข้า (`donation_import_batches.id` · `SV-CR-035` §3) — มีค่า = ป้าย "นำเข้า" · `null` = สร้างในระบบ */
+  importBatchId: string | null;
   /** หมายเหตุ ≤ `DONATION_NOTE_MAX_LENGTH` — คอลัมน์ "หมายเหตุ" ของ list (ตัดบรรทัดเดียว · คำสั่งเจ้าของ) · `null` = ไม่มี (`T-087`) */
   note: string | null;
   donor: DonationDonorView;
@@ -460,6 +506,12 @@ export interface DonationView extends DonationListItemView, OrderRecipientView {
   slipFiles: PaymentSlipFileView[];
   /** หมายเหตุของหลักฐานการโอน ≤ `DONATION_SLIP_NOTE_MAX_LENGTH` · `null` = ไม่มี (มีได้แม้ไม่มีไฟล์) */
   slipNote: string | null;
+  /** หลักฐานแบบลิงก์/ข้อความ ≤ `DONATION_EVIDENCE_ENTRIES_MAX` (`SV-CR-035`) · `[]` = ไม่มี */
+  evidenceEntries: DonationEvidenceEntryView[];
+  /** ข้อมูลประกอบ ≤ `DONATION_ADDITIONAL_INFO_MAX_LENGTH` · `null` = ไม่มี */
+  additionalInfo: string | null;
+  /** `true` = หน้า LINE OA ของผู้บริจาคแสดงข้อมูลประกอบ · `false` = เห็นเฉพาะ CMS (รายการที่นำเข้า) */
+  additionalInfoDonorVisible: boolean;
   items: DonationItemView[];
   /** Σ `lineTotal` (สตางค์) — เท่ากับ `souvenirTotalValue` (cache) · ชื่อเดียวกับ `OrderView.totalValue` */
   totalValue: string;
@@ -500,6 +552,16 @@ export interface DonationCreateInput {
   /** หมายเหตุหลักฐานการโอน ≤ `DONATION_SLIP_NOTE_MAX_LENGTH` (หลัง trim · เกิน → 422 `slipNote`) · `''` = ล้าง */
   slipNote?: string;
   /**
+   * หลักฐานแบบลิงก์/ข้อความ (`SV-CR-035` §1) — **แทนทั้งชุด** · ไม่ส่ง = ไม่มี (สร้าง) / คงเดิม (แก้ไข) · ≤ `DONATION_EVIDENCE_ENTRIES_MAX` ·
+   * `LINK` ต้อง `isEvidenceLink` ≤ `DONATION_EVIDENCE_LINK_MAX_LENGTH` · `TEXT` ≤ `DONATION_EVIDENCE_TEXT_MAX_LENGTH` · ว่าง → 422 `{ field: 'evidenceEntries.<i>.value', reason }` ·
+   * **ช่องการเงิน** — CONFIRMED เปลี่ยนจริง → 409 `DONATION_PAYMENT_LOCKED` (ส่งชุดเดิม = ผ่าน)
+   */
+  evidenceEntries?: DonationEvidenceEntryInput[];
+  /** ข้อมูลประกอบ ≤ `DONATION_ADDITIONAL_INFO_MAX_LENGTH` (หลัง trim · เกิน → 422 `additionalInfo`) · `''` = ล้าง · ไม่ใช่ช่องการเงิน */
+  additionalInfo?: string;
+  /** แสดงข้อมูลประกอบในหน้า LINE OA ของผู้บริจาค · ไม่ส่ง = `true` (สร้าง) / คงเดิม (แก้ไข) */
+  additionalInfoDonorVisible?: boolean;
+  /**
    * กองทุนที่รับบริจาค (`T-126` · SV-ADR-088) — **ไม่บังคับ** (Q-086) · ไม่ส่ง = ไม่มี (สร้าง) / คงเดิม (แก้ไข) · `null` = ล้าง ·
    * ผูกใหม่ต้องเลือกได้ (มีอยู่ · ไม่ถูกลบ · เปิดใช้งาน · โปรแกรมเปิด) ไม่งั้น 422 `DONATION_FUND_UNAVAILABLE` `{ field: 'fundId', reason }` ·
    * ค่าเดิมของรายการที่ปิดไปแล้วส่งซ้ำได้ · **ไม่ใช่ช่องการเงิน** (CONFIRMED เปลี่ยนได้ · ORDERED แก้ไม่ได้ทั้งใบ)
@@ -518,6 +580,15 @@ export interface DonationCreateInput {
  * ไม่ส่ง `items` แต่ยอดเปลี่ยน = เทียบกับเกณฑ์รวมที่บันทึกไว้ (`souvenirTotalThreshold`) · ไม่แตะยอด/รายการ = ไม่ตรวจงบ (รายการเดิมที่เกณฑ์รวมเกินยอดยังแก้ช่องอื่นได้)
  */
 export type DonationUpdateInput = Partial<DonationCreateInput>;
+
+/**
+ * body ของ `PATCH /donations/:id/additional-info` (`T-263` · Q-161) — แก้ "ข้อมูลประกอบ" อย่างเดียวได้**ทุกสถานะ** (รวม `ORDERED` / รายการนำเข้า) ·
+ * `additionalInfo` ≤ `DONATION_ADDITIONAL_INFO_MAX_LENGTH` (หลัง trim · `''` = ล้าง · เกิน 422 `additionalInfo`) · `additionalInfoDonorVisible` ไม่ส่ง = คงเดิม
+ */
+export interface DonationAdditionalInfoInput {
+  additionalInfo: string;
+  additionalInfoDonorVisible?: boolean;
+}
 
 /** body ของ `POST /donations/:id/reject` — เหตุผลบังคับ ≤ `DONATION_REJECT_REASON_MAX_LENGTH` */
 export interface DonationRejectInput {

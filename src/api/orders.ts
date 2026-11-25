@@ -386,6 +386,8 @@ export interface OrderListItemView {
    * ออเดอร์ที่ยังไม่ยกเลิก = ออเดอร์ active ของรายการนั้น (รายการเป็น `ORDERED` ⇔ มี ≥ 1 ใบ · แยกหลายใบได้ `T-113`) · ยกเลิกแล้วยังเก็บไว้เป็นประวัติ · ลบออเดอร์ที่มีค่านี้ไม่ได้ (409 `ORDER_LINKED_TO_DONATION`)
    */
   sourceDonation: OrderSourceDonationRef | null;
+  /** ชุดนำเข้า (`orders.import_batch_id` · `SV-CR-035` §3) — มีค่า = ป้าย "นำเข้า" (ออเดอร์จากการนำเข้ารายการบริจาคเก่า) · `null` = สร้างในระบบ */
+  importBatchId: string | null;
   /**
    * ออเดอร์ร่าง "รอของเข้า" (Pre-order · SV-ADR-098 · `T-142`) — `true` เฉพาะ `DRAFT` ที่มีสินค้าในใบซึ่ง Σ จำนวนของใบ > คงเหลือจริง (ยืนยันตอนนี้ = `STOCK_INSUFFICIENT`) ·
    * สถานะอื่น = `false` · คำนวณต่อหน้าจาก SQL กลาง (ตรงกับ `?stock=SHORT` และ Dashboard) · list เท่านั้น
